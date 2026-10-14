@@ -3,9 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="application-version" content="10.1.0">
+  <meta name="application-version" content="10.3.0">
   <meta name="application-schema" content="3">
-  <title>키보토스 대화 OS v10.1.0 · Spck</title>
+  <title>키보토스 대화 OS v10.3.0</title>
+  <meta name="theme-color" content="#8a2be2">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="키보토스">
+  <link rel="manifest" href="data:application/manifest+json;charset=utf-8,{"name":"키보토스 대화 OS","short_name":"키보토스","description":"블루 아카이브 키보토스 대화 OS","start_url":"./","display":"standalone","background_color":"#0b0e14","theme_color":"#8a2be2","orientation":"portrait","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%238a2be2' width='100' height='100' rx='20'/%3E%3Ctext x='50' y='62' font-size='48' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3EP%3C/text%3E%3C/svg%3E","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%238a2be2' width='100' height='100' rx='20'/%3E%3Ctext x='50' y='62' font-size='48' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3EP%3C/text%3E%3C/svg%3E">
+
   <!-- Spck Editor 호환: 외부 라이브러리 없이 단일 HTML로 실행됩니다.
        Spck에서 열기: 이 폴더를 프로젝트로 Open → index.html 선택 → Preview(▶)
        · 인터넷 필요 기능: Gemini API, 날씨(Open-Meteo)
@@ -976,6 +984,37 @@
       background-size: cover;
       background-position: center;
       background-attachment: local;
+    }
+    /* 비밀 코드 vision: 흰색·검은색 1:1 회전 배경 */
+    .room-bg-mono-spin {
+      background: #0b0e14 !important;
+      position: relative;
+      overflow: hidden;
+    }
+    .room-bg-mono-spin::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 220%;
+      height: 220%;
+      margin-left: -110%;
+      margin-top: -110%;
+      background: conic-gradient(#ffffff 0deg 180deg, #000000 180deg 360deg);
+      animation: mono-spin-rotate 8s linear infinite;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.55;
+    }
+    .room-bg-mono-spin .message-row,
+    .room-bg-mono-spin .message,
+    .room-bg-mono-spin > * {
+      position: relative;
+      z-index: 1;
+    }
+    @keyframes mono-spin-rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
     }
     /* BGM 파형 비주얼라이저 — 가로 스펙트럼 (위·아래 대칭) */
     #bgm-viz-layer {
@@ -7390,7 +7429,11 @@ ${bondNote}
     'Limbus Company Code 001': { type: 'unlock_hidden', chars: ['dante'], once: true },
     'Limbus Company Code 002': { type: 'unlock_hidden', chars: ['donquixote', 'ishmael', 'heathcliff', 'yisang', 'faust', 'gregor'], once: true },
     'Gematria': { type: 'unlock_hidden', chars: ['blacksuit', 'maestro', 'orwell', 'beatrice', 'underground'], once: true },
-    'BGM': { type: 'unlock_room', room: 'bgm_pulse', once: true }
+    'BGM': { type: 'unlock_room', room: 'bgm_pulse', once: true },
+    'Eligma': { type: 'eligma', amount: 300, once: true },
+    'hello': { type: 'credits', amount: 500, once: true },
+    'Chat Archive': { type: 'multi', pyroxene: 3000, credits: 2500, eligma: 500, once: true },
+    'vision': { type: 'unlock_room', room: 'mono_spin', once: true }
   };
   const SECRET_REDEEMED_KEY = 'PRANA_SECRET_REDEEMED';
 
@@ -7496,6 +7539,86 @@ ${bondNote}
       }
       alert('비밀 코드 적용 성공!\n미니게임 연속 지키기권(1회용) ' + amt + '장을 받았습니다.\n(현재 보유: ' + cur + '장)');
       try { if (typeof window.refreshStreakProtectUI === 'function') window.refreshStreakProtectUI(); } catch (e) {}
+    } else if (reward.type === 'eligma') {
+      const amt = Math.max(0, Math.floor(reward.amount || 0));
+      try {
+        if (typeof window.addEligma === 'function') window.addEligma(amt);
+        else {
+          var ek = 'PRANA_V103_ELIGMA';
+          var cur = Math.max(0, Math.floor(Number((typeof safeGet === 'function' ? safeGet(ek) : localStorage.getItem(ek)) || 0) || 0));
+          var next = String(cur + amt);
+          if (typeof safeSet === 'function') safeSet(ek, next); else localStorage.setItem(ek, next);
+        }
+      } catch (e) {}
+      if (msg) {
+        msg.style.color = '#22c55e';
+        msg.textContent = '✨ 엘리그마 +' + amt + ' 획득!';
+      }
+      alert('비밀 코드 적용 성공!\n엘리그마 ' + amt + '개를 받았습니다.');
+      try { if (typeof updateEligmaUI === 'function') updateEligmaUI(); } catch (e) {}
+      try { if (typeof refreshEconomyUI === 'function') refreshEconomyUI(); } catch (e) {}
+    } else if (reward.type === 'credits') {
+      const amt = Math.max(0, Math.floor(reward.amount || 0));
+      try {
+        if (typeof window.addCredits === 'function') window.addCredits(amt);
+        else {
+          var ck = 'PRANA_SCHALE_CREDITS';
+          var curC = Math.max(0, Math.floor(Number((typeof safeGet === 'function' ? safeGet(ck) : localStorage.getItem(ck)) || 0) || 0));
+          var nextC = String(curC + amt);
+          if (typeof safeSet === 'function') safeSet(ck, nextC); else localStorage.setItem(ck, nextC);
+        }
+      } catch (e) {}
+      if (msg) {
+        msg.style.color = '#22c55e';
+        msg.textContent = '🪙 크레딧 +' + amt + ' 획득!';
+      }
+      alert('비밀 코드 적용 성공!\n크레딧 ' + amt + '개를 받았습니다.');
+      try { if (typeof refreshEconomyUI === 'function') refreshEconomyUI(); } catch (e) {}
+    } else if (reward.type === 'multi') {
+      const pAmt = Math.max(0, Math.floor(reward.pyroxene || 0));
+      const cAmt = Math.max(0, Math.floor(reward.credits || 0));
+      const eAmt = Math.max(0, Math.floor(reward.eligma || 0));
+      const parts = [];
+      if (pAmt > 0) {
+        try {
+          if (typeof window.addPyroxene === 'function') window.addPyroxene(pAmt);
+          else {
+            pyroxene = loadNum(PYRO_KEY, pyroxene) + pAmt;
+            saveNum(PYRO_KEY, pyroxene);
+            updateGachaUI();
+          }
+        } catch (e) {}
+        parts.push('청휘석 +' + pAmt);
+      }
+      if (cAmt > 0) {
+        try {
+          if (typeof window.addCredits === 'function') window.addCredits(cAmt);
+          else {
+            var ck2 = 'PRANA_SCHALE_CREDITS';
+            var curC2 = Math.max(0, Math.floor(Number((typeof safeGet === 'function' ? safeGet(ck2) : localStorage.getItem(ck2)) || 0) || 0));
+            if (typeof safeSet === 'function') safeSet(ck2, String(curC2 + cAmt)); else localStorage.setItem(ck2, String(curC2 + cAmt));
+          }
+        } catch (e) {}
+        parts.push('크레딧 +' + cAmt);
+      }
+      if (eAmt > 0) {
+        try {
+          if (typeof window.addEligma === 'function') window.addEligma(eAmt);
+          else {
+            var ek2 = 'PRANA_V103_ELIGMA';
+            var curE = Math.max(0, Math.floor(Number((typeof safeGet === 'function' ? safeGet(ek2) : localStorage.getItem(ek2)) || 0) || 0));
+            if (typeof safeSet === 'function') safeSet(ek2, String(curE + eAmt)); else localStorage.setItem(ek2, String(curE + eAmt));
+          }
+        } catch (e) {}
+        parts.push('엘리그마 +' + eAmt);
+      }
+      if (msg) {
+        msg.style.color = '#22c55e';
+        msg.textContent = '🎁 ' + parts.join(' · ');
+      }
+      alert('비밀 코드 적용 성공!\n' + parts.join('\n'));
+      try { if (typeof updateEligmaUI === 'function') updateEligmaUI(); } catch (e) {}
+      try { if (typeof refreshEconomyUI === 'function') refreshEconomyUI(); } catch (e) {}
     } else if (reward.type === 'unlock_room') {
       const roomId = reward.room || 'bgm_pulse';
       let unlocked = false;
@@ -7512,12 +7635,20 @@ ${bondNote}
           try { if (typeof applyRoomBackground === 'function') applyRoomBackground(roomId); } catch (e) {}
         }
       } catch (e) {}
+      var roomLabel = roomId === 'bgm_pulse' ? 'BGM 펄스'
+        : roomId === 'mono_spin' ? '모노크롬 스핀'
+        : roomId;
       if (msg) {
         msg.style.color = '#22c55e';
-        msg.textContent = unlocked ? '🖼️ 배경 「BGM 펄스」 해금 & 적용!' : '이미 보유한 배경입니다.';
+        msg.textContent = unlocked ? ('🖼️ 배경 「' + roomLabel + '」 해금 & 적용!') : '이미 보유한 배경입니다.';
       }
+      var roomHint = roomId === 'bgm_pulse'
+        ? '\n(BGM을 켜면 중앙 비주얼이 움직입니다)'
+        : roomId === 'mono_spin'
+        ? '\n(흰색과 검은색이 1:1로 회전하는 배경입니다)'
+        : '';
       alert(unlocked
-        ? '비밀 코드 적용 성공!\n배경 「BGM 펄스」가 해금되어 적용되었습니다.\n(BGM을 켜면 중앙 비주얼이 움직입니다)'
+        ? ('비밀 코드 적용 성공!\n배경 「' + roomLabel + '」가 해금되어 적용되었습니다.' + roomHint)
         : '비밀 코드가 확인되었습니다.\n이미 해당 배경을 보유 중입니다.');
     } else if (reward.type === 'unlock_hidden') {
       const chars = Array.isArray(reward.chars) ? reward.chars : [];
@@ -9573,7 +9704,10 @@ try {
       css: 'linear-gradient(180deg, rgba(249,168,212,0.92) 0%, rgba(147,197,253,0.88) 38%, rgba(196,181,253,0.85) 62%, rgba(249,168,212,0.9) 82%, rgba(34,211,238,0.95) 100%)' },
     { id: 'bgm_pulse_alt', name: 'BGM 웨이브', free: false, special: true, lockedReward: true,
       preview: 'linear-gradient(180deg,#fda4af 0%,#a5b4fc 45%,#67e8f9 100%)',
-      css: 'linear-gradient(180deg, rgba(253,164,175,0.9) 0%, rgba(165,180,252,0.88) 45%, rgba(103,232,249,0.92) 100%)' }
+      css: 'linear-gradient(180deg, rgba(253,164,175,0.9) 0%, rgba(165,180,252,0.88) 45%, rgba(103,232,249,0.92) 100%)' },
+    { id: 'mono_spin', name: '모노크롬 스핀', free: false, special: true, lockedReward: true,
+      preview: 'conic-gradient(#ffffff 0deg 180deg, #000000 180deg 360deg)',
+      css: 'mono_spin' }
   ];
 
   function loadNum(key, def) {
@@ -9780,8 +9914,12 @@ try {
     const chat = document.getElementById('chat-container');
     if (!chat) return;
     const room = ROOM_BACKGROUNDS.find(function (r) { return r.id === id; }) || ROOM_BACKGROUNDS[0];
+    chat.classList.remove('room-bg-mono-spin');
     if (!room.css) {
       chat.classList.remove('room-bg');
+      chat.style.backgroundImage = '';
+    } else if (room.css === 'mono_spin' || room.id === 'mono_spin') {
+      chat.classList.add('room-bg', 'room-bg-mono-spin');
       chat.style.backgroundImage = '';
     } else {
       chat.classList.add('room-bg');
@@ -9832,7 +9970,11 @@ try {
         }
         // purchase
         if (room.lockedReward) {
-          alert('이 배경은 시즌 패스 Lv.10 보상 또는 비밀 코드「BGM」으로만 해금됩니다.');
+          if (room.id === 'mono_spin') {
+            alert('이 배경은 비밀 코드「vision」으로만 해금됩니다.');
+          } else {
+            alert('이 배경은 시즌 패스 Lv.10 보상 또는 비밀 코드「BGM」으로만 해금됩니다.');
+          }
           return;
         }
         if (room.costCredit) {
@@ -15246,6 +15388,1546 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
   function boot() { injectMobileStyle(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
+})();
+</script>
+
+
+<script>
+/* PWA Service Worker - 단일 HTML 오프라인 캐시 */
+(function(){
+  if (!('serviceWorker' in navigator)) return;
+  var SW_CODE = `
+    const CACHE = 'kivotos-v10.1.0';
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./'])).then(() => self.skipWaiting()));
+    });
+    self.addEventListener('activate', e => {
+      e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+    });
+    self.addEventListener('fetch', e => {
+      e.respondWith(
+        caches.match(e.request).then(r => r || fetch(e.request).then(res => {
+          if (e.request.method === 'GET' && res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone));
+          }
+          return res;
+        }).catch(() => caches.match('./')))
+      );
+    });
+  `;
+  var blob = new Blob([SW_CODE], {type: 'application/javascript'});
+  var url = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(url).catch(function(){});
+})();
+</script>
+
+
+<script id="v102-season-pass-cosmetics">
+/* v10.2: 시즌 패스 전용 스탬프·배경·BGM (봄/여름/가을/겨울)
+   - 시즌이 바뀌면 해당 시즌 해금이 초기화되고, 같은 시즌이 다시 와도 처음부터
+   - 패스 Lv.3 스탬프 / Lv.5 배경 / Lv.7 BGM / Lv.10 디럭스 배경 */
+(function () {
+  'use strict';
+
+  var STORAGE = {
+    cosmetics: 'PRANA_V102_SEASON_COSMETICS',
+    lastBase: 'PRANA_V102_LAST_BASE_SEASON',
+    activeBgm: 'PRANA_V102_SEASON_BGM_ON'
+  };
+
+  var SEASON_SETS = {
+    spring: {
+      id: 'spring', name: '봄', icon: '🌸',
+      stamps: [
+        ['🌸', '벚꽃'], ['🌱', '새싹'], ['🦋', '나비'], ['🎀', '리본'],
+        ['🌼', '봄꽃'], ['🧺', '소풍'], ['🐣', '병아리'], ['🎐', '바람']
+      ],
+      rooms: [
+        {
+          id: 'season_spring_park',
+          name: '🌸 봄 · 벚꽃 산책로',
+          preview: 'linear-gradient(135deg,#fce7f3,#fbcfe8,#a7f3d0)',
+          css: 'linear-gradient(160deg, rgba(252,231,243,0.5) 0%, rgba(251,207,232,0.45) 40%, rgba(167,243,208,0.4) 100%)'
+        },
+        {
+          id: 'season_spring_dx',
+          name: '🌸 봄 · 신입생 광장 (디럭스)',
+          preview: 'linear-gradient(135deg,#fdf2f8,#f9a8d4,#86efac,#7dd3fc)',
+          css: 'linear-gradient(150deg, rgba(253,242,248,0.55) 0%, rgba(249,168,212,0.45) 35%, rgba(134,239,172,0.4) 70%, rgba(125,211,252,0.4) 100%)',
+          deluxe: true
+        }
+      ],
+      bgm: {
+        id: 'season_spring_bgm',
+        title: '봄 · 신입생의 바람',
+        subtitle: '시즌 패스 BGM',
+        tint: 'rgba(244,114,182,0.2)',
+        accent: '#f472b6'
+      }
+    },
+    summer: {
+      id: 'summer', name: '여름', icon: '☀️',
+      stamps: [
+        ['☀️', '햇살'], ['🌊', '파도'], ['🍦', '아이스크림'], ['🏖️', '해변'],
+        ['🍉', '수박'], ['🎇', '불꽃'], ['🍹', '음료'], ['🐠', '물고기']
+      ],
+      rooms: [
+        {
+          id: 'season_summer_beach',
+          name: '☀️ 여름 · 키보토스 해변',
+          preview: 'linear-gradient(135deg,#0ea5e9,#38bdf8,#fde68a)',
+          css: 'linear-gradient(160deg, rgba(14,165,233,0.45) 0%, rgba(56,189,248,0.4) 45%, rgba(253,230,138,0.35) 100%)'
+        },
+        {
+          id: 'season_summer_dx',
+          name: '☀️ 여름 · 밤 불꽃축제 (디럭스)',
+          preview: 'linear-gradient(135deg,#1e3a8a,#7c3aed,#f97316,#fbbf24)',
+          css: 'linear-gradient(150deg, rgba(30,58,138,0.55) 0%, rgba(124,58,237,0.4) 40%, rgba(249,115,22,0.4) 70%, rgba(251,191,36,0.35) 100%)',
+          deluxe: true
+        }
+      ],
+      bgm: {
+        id: 'season_summer_bgm',
+        title: '여름 · 해변 축제',
+        subtitle: '시즌 패스 BGM',
+        tint: 'rgba(56,189,248,0.18)',
+        accent: '#38bdf8'
+      }
+    },
+    autumn: {
+      id: 'autumn', name: '가을', icon: '🍂',
+      stamps: [
+        ['🍂', '단풍'], ['🍁', '단풍잎'], ['🎃', '호박'], ['📚', '독서'],
+        ['🍠', '군고구마'], ['🎑', '달구경'], ['☕', '따뜻한 음료'], ['🎻', '문화제']
+      ],
+      rooms: [
+        {
+          id: 'season_autumn_garden',
+          name: '🍂 가을 · 단풍 정원',
+          preview: 'linear-gradient(135deg,#9a3412,#ea580c,#fbbf24)',
+          css: 'linear-gradient(160deg, rgba(154,52,18,0.5) 0%, rgba(234,88,12,0.4) 45%, rgba(251,191,36,0.35) 100%)'
+        },
+        {
+          id: 'season_autumn_dx',
+          name: '🍂 가을 · 문화제 야시장 (디럭스)',
+          preview: 'linear-gradient(135deg,#7c2d12,#c2410c,#f59e0b,#fef3c7)',
+          css: 'linear-gradient(150deg, rgba(124,45,18,0.55) 0%, rgba(194,65,12,0.45) 40%, rgba(245,158,11,0.4) 70%, rgba(254,243,199,0.35) 100%)',
+          deluxe: true
+        }
+      ],
+      bgm: {
+        id: 'season_autumn_bgm',
+        title: '가을 · 문화제 선율',
+        subtitle: '시즌 패스 BGM',
+        tint: 'rgba(251,146,60,0.18)',
+        accent: '#fb923c'
+      }
+    },
+    winter: {
+      id: 'winter', name: '겨울', icon: '❄️',
+      stamps: [
+        ['❄️', '눈꽃'], ['⛄', '눈사람'], ['🧣', '목도리'], ['☕', '코코아'],
+        ['🎄', '트리'], ['🎁', '선물'], ['🕯️', '캔들'], ['🐧', '펭귄']
+      ],
+      rooms: [
+        {
+          id: 'season_winter_snow',
+          name: '❄️ 겨울 · 눈 내리는 샬레',
+          preview: 'linear-gradient(135deg,#0f172a,#1e3a5f,#e2e8f0)',
+          css: 'linear-gradient(160deg, rgba(15,23,42,0.7) 0%, rgba(30,58,95,0.55) 50%, rgba(226,232,240,0.35) 100%)'
+        },
+        {
+          id: 'season_winter_dx',
+          name: '❄️ 겨울 · 난로 옆 휴게실 (디럭스)',
+          preview: 'linear-gradient(135deg,#1c1917,#7c2d12,#fbbf24,#fef3c7)',
+          css: 'linear-gradient(150deg, rgba(28,25,23,0.65) 0%, rgba(124,45,18,0.45) 40%, rgba(251,191,36,0.35) 75%, rgba(254,243,199,0.3) 100%)',
+          deluxe: true
+        }
+      ],
+      bgm: {
+        id: 'season_winter_bgm',
+        title: '겨울 · 난로 옆 멜로디',
+        subtitle: '시즌 패스 BGM',
+        tint: 'rgba(147,197,253,0.2)',
+        accent: '#93c5fd'
+      }
+    }
+  };
+
+  function sg(k) {
+    try {
+      if (typeof safeGet === 'function') { var v = safeGet(k); return v == null ? '' : String(v); }
+      return localStorage.getItem(k) || '';
+    } catch (e) { return ''; }
+  }
+  function ss(k, v) {
+    try {
+      if (typeof safeSet === 'function') safeSet(k, String(v));
+      else localStorage.setItem(k, String(v));
+    } catch (e) {}
+  }
+  function loadJSON(k, d) {
+    try { var r = sg(k); if (!r) return d; var p = JSON.parse(r); return p != null ? p : d; } catch (e) { return d; }
+  }
+  function saveJSON(k, o) {
+    try { ss(k, JSON.stringify(o)); } catch (e) {}
+  }
+
+  function baseSeasonId() {
+    var m = new Date().getMonth() + 1;
+    if (m >= 3 && m <= 5) return 'spring';
+    if (m >= 6 && m <= 8) return 'summer';
+    if (m >= 9 && m <= 10) return 'autumn';
+    return 'winter';
+  }
+
+  function getSet(sid) {
+    return SEASON_SETS[sid] || SEASON_SETS.spring;
+  }
+
+  function loadCosmetics() {
+    var o = loadJSON(STORAGE.cosmetics, {});
+    return o && typeof o === 'object' ? o : {};
+  }
+  function saveCosmetics(o) { saveJSON(STORAGE.cosmetics, o); }
+
+  function seasonUnlockBucket(sid) {
+    var all = loadCosmetics();
+    if (!all[sid] || typeof all[sid] !== 'object') {
+      all[sid] = { stamps: false, room: false, bgm: false, deluxe: false };
+    }
+    return all[sid];
+  }
+
+  function isUnlocked(kind) {
+    var sid = baseSeasonId();
+    var b = seasonUnlockBucket(sid);
+    if (kind === 'stamps') return !!b.stamps;
+    if (kind === 'room') return !!b.room;
+    if (kind === 'bgm') return !!b.bgm;
+    if (kind === 'deluxe') return !!b.deluxe;
+    return false;
+  }
+
+  function unlockKind(kind) {
+    var sid = baseSeasonId();
+    var all = loadCosmetics();
+    if (!all[sid]) all[sid] = { stamps: false, room: false, bgm: false, deluxe: false };
+    all[sid][kind] = true;
+    saveCosmetics(all);
+    return getSet(sid);
+  }
+
+  function ensureSeasonReset() {
+    var sid = baseSeasonId();
+    var last = sg(STORAGE.lastBase);
+    if (last && last !== sid) {
+      var all = loadCosmetics();
+      all[sid] = { stamps: false, room: false, bgm: false, deluxe: false };
+      saveCosmetics(all);
+      ss(STORAGE.activeBgm, '0');
+      try {
+        var cur = sg('PRANA_CHAT_BG') || '';
+        if (cur.indexOf('season_') === 0) {
+          try { localStorage.setItem('PRANA_CHAT_BG', 'none'); } catch (e) {}
+          try {
+            var cc = document.getElementById('chat-container');
+            if (cc) {
+              cc.style.backgroundImage = '';
+              cc.classList.remove('room-bg');
+            }
+          } catch (e2) {}
+        }
+      } catch (e) {}
+      try {
+        if (typeof appendMessage === 'function') {
+          appendMessage('시스템',
+            getSet(sid).icon + ' ' + getSet(sid).name + ' 시즌이 시작되었습니다. 시즌 패스 전용 스탬프·배경·BGM 해금이 초기화되었습니다.',
+            true, '시스템', null, { hideActions: true });
+        }
+      } catch (e) {}
+    }
+    ss(STORAGE.lastBase, sid);
+  }
+
+  function grantForLevel(level) {
+    var set = getSet(baseSeasonId());
+    var msgs = [];
+    if (level === 3) {
+      unlockKind('stamps');
+      msgs.push(set.icon + ' ' + set.name + ' 시즌 스탬프 팩 해금');
+    }
+    if (level === 5) {
+      unlockKind('room');
+      var room = set.rooms[0];
+      try {
+        if (typeof window.unlockChatRoom === 'function') window.unlockChatRoom(room.id, false);
+        else {
+          var ok = localStorage.getItem('PRANA_OWNED_ROOMS');
+          var arr = ok ? JSON.parse(ok) : [];
+          if (!Array.isArray(arr)) arr = [];
+          if (arr.indexOf(room.id) < 0) { arr.push(room.id); localStorage.setItem('PRANA_OWNED_ROOMS', JSON.stringify(arr)); }
+        }
+      } catch (e) {}
+      msgs.push('배경「' + room.name + '」해금');
+    }
+    if (level === 7) {
+      unlockKind('bgm');
+      msgs.push('BGM「' + set.bgm.title + '」해금');
+    }
+    if (level === 10) {
+      unlockKind('deluxe');
+      unlockKind('stamps');
+      unlockKind('room');
+      unlockKind('bgm');
+      var dx = set.rooms[1];
+      try {
+        if (typeof window.unlockChatRoom === 'function') window.unlockChatRoom(dx.id, false);
+        else {
+          var ok2 = localStorage.getItem('PRANA_OWNED_ROOMS');
+          var arr2 = ok2 ? JSON.parse(ok2) : [];
+          if (!Array.isArray(arr2)) arr2 = [];
+          if (arr2.indexOf(dx.id) < 0) { arr2.push(dx.id); localStorage.setItem('PRANA_OWNED_ROOMS', JSON.stringify(arr2)); }
+        }
+      } catch (e) {}
+      msgs.push('디럭스 배경「' + dx.name + '」해금');
+    }
+    return msgs;
+  }
+
+  function hookClaimPass() {
+    if (typeof window.claimPassTier !== 'function' || window.claimPassTier.__v102) return;
+    var orig = window.claimPassTier;
+    window.claimPassTier = function (level) {
+      var beforeClaimed = false;
+      try {
+        var claimed = loadJSON('PRANA_V10_PASS_CLAIM', {});
+        beforeClaimed = !!claimed[level];
+      } catch (e) {}
+      var ret = orig.apply(this, arguments);
+      if (!beforeClaimed) {
+        try {
+          var claimed2 = loadJSON('PRANA_V10_PASS_CLAIM', {});
+          if (claimed2[level]) {
+            var extra = grantForLevel(level);
+            if (extra.length) {
+              setTimeout(function () {
+                alert('시즌 패스 코스메틱!\n' + extra.join('\n'));
+                refreshSeasonUI();
+              }, 50);
+            }
+          }
+        } catch (e) {}
+      }
+      return ret;
+    };
+    window.claimPassTier.__v102 = true;
+  }
+
+  function injectSeasonStamps() {
+    var grid = document.getElementById('stamp-grid');
+    if (!grid) return;
+    var old = document.getElementById('v102-season-stamp-wrap');
+    if (old) old.remove();
+
+    var sid = baseSeasonId();
+    var set = getSet(sid);
+    var unlocked = isUnlocked('stamps');
+
+    var wrap = document.createElement('div');
+    wrap.id = 'v102-season-stamp-wrap';
+    wrap.style.cssText = 'grid-column:1/-1;margin-top:8px;';
+    wrap.innerHTML =
+      '<div style="font-size:12px;font-weight:700;color:var(--accent-color);margin:6px 0 8px;display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+      '<span>' + set.icon + ' ' + set.name + ' 시즌 스탬프</span>' +
+      '<span style="font-size:11px;opacity:.85;">' + (unlocked ? '해금됨' : '패스 Lv.3 해금') + '</span></div>' +
+      '<div id="v102-season-stamp-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;"></div>';
+
+    grid.parentNode.insertBefore(wrap, grid.nextSibling);
+    var sgrid = document.getElementById('v102-season-stamp-grid');
+    set.stamps.forEach(function (pair) {
+      var emoji = pair[0], label = pair[1];
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'stamp-option';
+      if (!unlocked) {
+        btn.style.opacity = '0.4';
+        btn.style.pointerEvents = 'none';
+        btn.innerHTML = emoji + '<span>🔒 ' + label + '</span>';
+      } else {
+        btn.innerHTML = emoji + '<span>' + label + '</span>';
+        btn.onclick = function () {
+          try {
+            if (typeof sendStamp === 'function') { sendStamp(emoji, label); return; }
+            if (typeof window.sendStamp === 'function') { window.sendStamp(emoji, label); return; }
+          } catch (e0) {}
+          try {
+            var stampText = emoji + label;
+            if (typeof conversationHistory !== 'undefined' && Array.isArray(conversationHistory)) {
+              var historyIndex = conversationHistory.length;
+              conversationHistory.push({ role: 'user', parts: [{ text: '[모모톡 스탬프] ' + stampText }] });
+              if (typeof appendMessage === 'function') {
+                var uname = (typeof getUserDisplayName === 'function') ? getUserDisplayName() : '선생님';
+                appendMessage(uname, stampText, false, '', historyIndex, { sticker: true });
+              }
+              if (typeof saveConversation === 'function') saveConversation();
+            } else {
+              var input = document.getElementById('user-input');
+              if (input) input.value = '[모모톡 스탬프] ' + stampText;
+              if (typeof sendMessage === 'function') sendMessage();
+            }
+            var modal = document.getElementById('stamp-modal');
+            if (modal) modal.style.display = 'none';
+            try { if (typeof window.trackMission === 'function') window.trackMission('stamp', 1); } catch (e1) {}
+          } catch (e) { alert('스탬프 전송 실패: ' + e.message); }
+        };
+      }
+      sgrid.appendChild(btn);
+    });
+  }
+
+  function hookStampModal() {
+    if (typeof window.openStampModal === 'function' && !window.openStampModal.__v102) {
+      var o = window.openStampModal;
+      window.openStampModal = function () {
+        var r = o.apply(this, arguments);
+        setTimeout(injectSeasonStamps, 30);
+        return r;
+      };
+      window.openStampModal.__v102 = true;
+    }
+    var stampBtn = document.getElementById('stamp-open-btn');
+    if (stampBtn && !stampBtn.__v102) {
+      stampBtn.__v102 = true;
+      stampBtn.addEventListener('click', function () {
+        setTimeout(injectSeasonStamps, 80);
+      });
+    }
+  }
+
+  function applySeasonRoomCss(room) {
+    if (!room) return;
+    var cc = document.getElementById('chat-container');
+    if (!cc) return;
+    cc.classList.add('room-bg');
+    cc.style.backgroundImage = room.css;
+    cc.style.backgroundSize = 'cover';
+    cc.style.backgroundPosition = 'center';
+    try { localStorage.setItem('PRANA_CHAT_BG', room.id); } catch (e) {}
+    try { if (typeof safeSet === 'function') safeSet('PRANA_CHAT_BG', room.id); } catch (e) {}
+  }
+
+  function injectSeasonRooms() {
+    var grid = document.getElementById('room-grid');
+    if (!grid) return;
+    var old = document.getElementById('v102-season-room-wrap');
+    if (old) old.remove();
+
+    var sid = baseSeasonId();
+    var set = getSet(sid);
+    var wrap = document.createElement('div');
+    wrap.id = 'v102-season-room-wrap';
+    wrap.style.cssText = 'grid-column:1/-1;margin-top:6px;';
+
+    var html = '<div style="font-size:12px;font-weight:700;color:var(--accent-color);margin:4px 0 8px;">' +
+      set.icon + ' ' + set.name + ' 시즌 패스 배경</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">';
+
+    set.rooms.forEach(function (room) {
+      var need = room.deluxe ? isUnlocked('deluxe') : isUnlocked('room');
+      var cur = sg('PRANA_CHAT_BG') || '';
+      var active = cur === room.id;
+      html += '<div class="room-card' + (active ? ' active' : '') + '" data-v102-room="' + room.id + '" style="' + (need ? '' : 'opacity:0.55;') + '">' +
+        '<div class="room-preview" style="background:' + room.preview + '"></div>' +
+        '<div class="room-name">' + room.name + '</div>' +
+        '<div class="room-cost">' +
+        (need ? (active ? '✓ 적용 중' : '보유 · 탭하여 적용') : ('🔒 패스 Lv.' + (room.deluxe ? '10' : '5'))) +
+        '</div></div>';
+    });
+    html += '</div>';
+    wrap.innerHTML = html;
+    grid.parentNode.insertBefore(wrap, grid.nextSibling);
+
+    wrap.querySelectorAll('[data-v102-room]').forEach(function (card) {
+      card.addEventListener('click', function () {
+        var id = card.getAttribute('data-v102-room');
+        var room = set.rooms.find(function (r) { return r.id === id; });
+        if (!room) return;
+        var need = room.deluxe ? isUnlocked('deluxe') : isUnlocked('room');
+        if (!need) {
+          alert('시즌 패스 Lv.' + (room.deluxe ? '10' : '5') + ' 보상으로 해금됩니다.\n(시즌이 바뀌면 해금이 초기화됩니다)');
+          return;
+        }
+        applySeasonRoomCss(room);
+        var msg = document.getElementById('room-msg');
+        if (msg) msg.textContent = '「' + room.name + '」 배경이 적용되었습니다.';
+        injectSeasonRooms();
+      });
+    });
+  }
+
+  function hookRoomModal() {
+    if (typeof window.openRoomModal === 'function' && !window.openRoomModal.__v102) {
+      var o = window.openRoomModal;
+      window.openRoomModal = function () {
+        var r = o.apply(this, arguments);
+        setTimeout(injectSeasonRooms, 40);
+        return r;
+      };
+      window.openRoomModal.__v102 = true;
+    }
+  }
+
+  function restoreSeasonRoom() {
+    var cur = sg('PRANA_CHAT_BG') || '';
+    if (cur.indexOf('season_') !== 0) return;
+    var sid = baseSeasonId();
+    var set = getSet(sid);
+    var room = set.rooms.find(function (r) { return r.id === cur; });
+    if (!room) return;
+    var need = room.deluxe ? isUnlocked('deluxe') : isUnlocked('room');
+    if (!need) {
+      try { localStorage.setItem('PRANA_CHAT_BG', 'none'); } catch (e) {}
+      return;
+    }
+    applySeasonRoomCss(room);
+  }
+
+  function injectSeasonBgmUI() {
+    var list = document.getElementById('bgm-track-list');
+    if (!list) return;
+    if (injectSeasonBgmUI._busy) return;
+    injectSeasonBgmUI._busy = true;
+    try {
+      var sid = baseSeasonId();
+      var set = getSet(sid);
+      var unlocked = isUnlocked('bgm');
+      var on = sg(STORAGE.activeBgm) === '1';
+      var stateKey = sid + '|' + (unlocked ? '1' : '0') + '|' + (on ? '1' : '0');
+      var existing = document.getElementById('v102-season-bgm-btn');
+      if (existing && existing.getAttribute('data-v102-state') === stateKey) return;
+
+      if (existing) existing.remove();
+
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'v102-season-bgm-btn';
+      btn.className = 'menu-item-btn';
+      btn.style.marginTop = '8px';
+      btn.setAttribute('data-v102-state', stateKey);
+      if (!unlocked) {
+        btn.innerHTML = '🔒 ' + set.icon + ' ' + set.bgm.title + ' <span style="font-size:11px;opacity:.8;">(패스 Lv.7)</span>';
+        btn.onclick = function () {
+          alert('시즌 패스 Lv.7 보상으로 해금됩니다.\n시즌이 바뀌면 해금이 초기화됩니다.');
+        };
+      } else {
+        btn.innerHTML = (on ? '▶ ' : '') + set.icon + ' ' + set.bgm.title +
+          (on ? ' <span style="color:var(--accent-color);font-size:11px;">적용 중</span>' : '');
+        btn.onclick = function () {
+          var next = sg(STORAGE.activeBgm) !== '1';
+          ss(STORAGE.activeBgm, next ? '1' : '0');
+          applySeasonBgmSkin(next);
+          injectSeasonBgmUI();
+          try { if (typeof window.playBgm === 'function') window.playBgm(); } catch (e) {}
+        };
+      }
+      list.appendChild(btn);
+    } finally {
+      injectSeasonBgmUI._busy = false;
+    }
+  }
+
+  function applySeasonBgmSkin(on) {
+    var sid = baseSeasonId();
+    var set = getSet(sid);
+    var style = document.getElementById('v102-season-bgm-style');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'v102-season-bgm-style';
+      document.head.appendChild(style);
+    }
+    if (on && isUnlocked('bgm')) {
+      style.textContent =
+        'body.v102-season-bgm #bgm-viz-layer .bgm-wave-bar.up{background:linear-gradient(180deg,' + set.bgm.accent + ' 0%,#f8fafc 100%)!important;}' +
+        'body.v102-season-bgm #bgm-viz-layer .bgm-wave-bar.down{background:linear-gradient(0deg,' + set.bgm.accent + ' 0%,#f8fafc 100%)!important;}' +
+        'body.v102-season-bgm .v75-time-tint{background:radial-gradient(ellipse at 50% 0%,transparent 40%,' + set.bgm.tint + ' 100%)!important;opacity:0.45!important;}';
+      document.body.classList.add('v102-season-bgm');
+      document.body.classList.add('v75-ambiance-on');
+      var status = document.querySelector('.bgm-status');
+      if (status) status.textContent = set.icon + ' ' + set.bgm.title + ' · 시즌 패스';
+    } else {
+      style.textContent = '';
+      document.body.classList.remove('v102-season-bgm');
+    }
+  }
+
+  function hookBgmModal() {
+    if (typeof window.refreshBgmTrackList === 'function' && !window.refreshBgmTrackList.__v102) {
+      var o = window.refreshBgmTrackList;
+      window.refreshBgmTrackList = function () {
+        var r = o.apply(this, arguments);
+        setTimeout(injectSeasonBgmUI, 30);
+        return r;
+      };
+      window.refreshBgmTrackList.__v102 = true;
+    }
+    // MutationObserver는 전체 body 감시 시 inject ↔ DOM 변경 루프로 프리즈될 수 있어 사용하지 않음
+    // BGM 모달 열기 경로만 안전하게 훅
+    if (typeof window.openBgmModal === 'function' && !window.openBgmModal.__v102) {
+      var ob = window.openBgmModal;
+      window.openBgmModal = function () {
+        var r = ob.apply(this, arguments);
+        setTimeout(injectSeasonBgmUI, 50);
+        return r;
+      };
+      window.openBgmModal.__v102 = true;
+    }
+    // 메뉴에서 openModalFromMenu('bgm') 등으로 열리는 경우: 모달 display 변경 감지 (한 요소만)
+    try {
+      var bgmModal = document.getElementById('bgm-modal');
+      if (bgmModal && !bgmModal.__v102obs) {
+        bgmModal.__v102obs = true;
+        var t = null;
+        var obs = new MutationObserver(function () {
+          if (t) clearTimeout(t);
+          t = setTimeout(function () {
+            try {
+              var style = (bgmModal.style && bgmModal.style.display) || '';
+              var cs = window.getComputedStyle ? getComputedStyle(bgmModal).display : style;
+              if (style === 'flex' || cs === 'flex' || style === 'block' || cs === 'block') {
+                injectSeasonBgmUI();
+              }
+            } catch (e) {}
+          }, 80);
+        });
+        obs.observe(bgmModal, { attributes: true, attributeFilter: ['style', 'class'] });
+      }
+    } catch (e) {}
+  }
+
+  function enhancePassTabHint() {
+    var body = document.getElementById('v10-hub-body');
+    if (!body) return;
+    if (document.getElementById('v102-pass-hint')) return;
+    var sid = baseSeasonId();
+    var set = getSet(sid);
+    var hint = document.createElement('div');
+    hint.id = 'v102-pass-hint';
+    hint.className = 'v10-card';
+    hint.style.marginBottom = '8px';
+    var st = isUnlocked('stamps'), rm = isUnlocked('room'), bg = isUnlocked('bgm'), dx = isUnlocked('deluxe');
+    hint.innerHTML =
+      '<h4>' + set.icon + ' ' + set.name + ' 시즌 패스 코스메틱</h4>' +
+      '<div class="v10-meta">시즌이 바뀌면 해금이 초기화됩니다. 같은 시즌이 다시 와도 처음부터입니다.</div>' +
+      '<div class="v10-meta" style="margin-top:6px;line-height:1.6;">' +
+      'Lv.3 스탬프 ' + (st ? '✅' : '🔒') + ' · ' +
+      'Lv.5 배경 ' + (rm ? '✅' : '🔒') + ' · ' +
+      'Lv.7 BGM ' + (bg ? '✅' : '🔒') + ' · ' +
+      'Lv.10 디럭스 ' + (dx ? '✅' : '🔒') +
+      '</div>';
+    body.insertBefore(hint, body.firstChild);
+  }
+
+  function hookHubRender() {
+    if (typeof window.__v10Render === 'function' && !window.__v10Render.__v102) {
+      var o = window.__v10Render;
+      window.__v10Render = function (tab) {
+        var r = o.apply(this, arguments);
+        if (tab === 'sp' || tab === 'sm') setTimeout(enhancePassTabHint, 40);
+        return r;
+      };
+      window.__v10Render.__v102 = true;
+    }
+  }
+
+  function refreshSeasonUI() {
+    injectSeasonStamps();
+    injectSeasonRooms();
+    injectSeasonBgmUI();
+    enhancePassTabHint();
+  }
+
+  function annotatePassLabels() {
+    try {
+      var cards = document.querySelectorAll('#v10-hub-body .v10-card');
+      cards.forEach(function (c) {
+        var t = c.textContent || '';
+        if (t.indexOf('Lv.3') >= 0) {
+          var rew = c.querySelector('.v10-rew');
+          if (rew && rew.textContent.indexOf('스탬프') < 0) rew.textContent += ' · 시즌 스탬프';
+        }
+        if (t.indexOf('Lv.5') >= 0) {
+          var rew5 = c.querySelector('.v10-rew');
+          if (rew5 && rew5.textContent.indexOf('배경') < 0) rew5.textContent += ' · 시즌 배경';
+        }
+        if (t.indexOf('Lv.7') >= 0) {
+          var rew7 = c.querySelector('.v10-rew');
+          if (rew7 && rew7.textContent.indexOf('BGM') < 0) rew7.textContent += ' · 시즌 BGM';
+        }
+        if (t.indexOf('Lv.10') >= 0) {
+          var rew10 = c.querySelector('.v10-rew');
+          if (rew10 && rew10.textContent.indexOf('디럭스') < 0) rew10.textContent += ' · 디럭스 배경';
+        }
+      });
+    } catch (e) {}
+  }
+
+  function boot() {
+    ensureSeasonReset();
+    hookClaimPass();
+    hookStampModal();
+    hookRoomModal();
+    hookBgmModal();
+    hookHubRender();
+    restoreSeasonRoom();
+    if (sg(STORAGE.activeBgm) === '1' && isUnlocked('bgm')) applySeasonBgmSkin(true);
+    setInterval(function () {
+      ensureSeasonReset();
+      hookClaimPass();
+      hookStampModal();
+      hookRoomModal();
+      hookHubRender();
+      annotatePassLabels();
+    }, 2500);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+  window.v102SeasonCosmetics = {
+    baseSeasonId: baseSeasonId,
+    isUnlocked: isUnlocked,
+    getSet: getSet,
+    refresh: refreshSeasonUI
+  };
+})();
+</script>
+
+
+<script id="v103-eligma-setting-shop-season">
+/* v10.3: 시즌 패스 코스메틱 미션 · 엘리그마 · 설정 상점 */
+(function () {
+  'use strict';
+
+  var K = {
+    eligma: 'PRANA_V103_ELIGMA',
+    stampMode: 'PRANA_V103_STAMP_MODE',
+    smProg: 'PRANA_V103_SM_PROG',
+    smClaim: 'PRANA_V103_SM_CLAIM',
+    smDate: 'PRANA_V103_SM_DATE',
+    smSeason: 'PRANA_V103_SM_SEASON',
+    settingShop: 'PRANA_V103_SETTING_SHOP',
+    settingBought: 'PRANA_V103_SETTING_BOUGHT',
+    revealedCodes: 'PRANA_V103_REVEALED_CODES'
+  };
+
+  var SECRET_SHEET_CODES = [
+    'Eligma',
+    'hello',
+    'vision'
+  ];
+
+  var SELLABLE_ROOMS = [
+    { id: 'trinity', name: '트리니티 정원' },
+    { id: 'gehenna', name: '게헨나 노을' },
+    { id: 'millennium', name: '밀레니엄 랩' },
+    { id: 'arona', name: '아로나의 푸른 방' },
+    { id: 'momotalk', name: '모모톡 핑크' },
+    { id: 'starry', name: '별이 빛나는 밤' },
+    { id: 'cafe', name: '카페 테라스' }
+  ];
+
+  var EXTRA_MISSIONS = [
+    { id: 'sm_season_stamp', title: '시즌 스탬프 사용', desc: '시즌 패스 스탬프 1회 전송', track: 'season_stamp', target: 1, reward: { credits: 20, passXp: 25 }, icon: '🌸' },
+    { id: 'sm_season_room', title: '시즌 배경 적용', desc: '시즌 패스 배경 1회 적용', track: 'season_room', target: 1, reward: { credits: 25, passXp: 30 }, icon: '🖼️' },
+    { id: 'sm_season_bgm', title: '시즌 BGM 켜기', desc: '시즌 패스 BGM 스킨 켜기', track: 'season_bgm', target: 1, reward: { gifts: 1, passXp: 30 }, icon: '🎵' }
+  ];
+
+  function sg(k) {
+    try {
+      if (typeof safeGet === 'function') { var v = safeGet(k); return v == null ? '' : String(v); }
+      return localStorage.getItem(k) || '';
+    } catch (e) { return ''; }
+  }
+  function ss(k, v) {
+    try {
+      if (typeof safeSet === 'function') safeSet(k, String(v));
+      else localStorage.setItem(k, String(v));
+    } catch (e) {}
+  }
+  function loadJSON(k, d) {
+    try { var r = sg(k); if (!r) return d; var p = JSON.parse(r); return p != null ? p : d; } catch (e) { return d; }
+  }
+  function saveJSON(k, o) {
+    try { ss(k, JSON.stringify(o)); } catch (e) {}
+  }
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function baseSeasonId() {
+    try {
+      if (window.v102SeasonCosmetics && typeof window.v102SeasonCosmetics.baseSeasonId === 'function') {
+        return window.v102SeasonCosmetics.baseSeasonId();
+      }
+    } catch (e) {}
+    var m = new Date().getMonth() + 1;
+    if (m >= 3 && m <= 5) return 'spring';
+    if (m >= 6 && m <= 8) return 'summer';
+    if (m >= 9 && m <= 10) return 'autumn';
+    return 'winter';
+  }
+
+  function getEligma() {
+    return Math.max(0, Math.floor(Number(sg(K.eligma) || 0) || 0));
+  }
+  function setEligma(n) {
+    ss(K.eligma, String(Math.max(0, Math.floor(n))));
+    try { updateEligmaUI(); } catch (e) {}
+  }
+  function addEligma(n) {
+    setEligma(getEligma() + (n || 0));
+  }
+  window.getEligma = getEligma;
+  window.addEligma = addEligma;
+
+  function addGifts(n) {
+    var cur = Math.max(0, Math.floor(Number(sg('PRANA_BOND_GIFTS') || 0) || 0));
+    ss('PRANA_BOND_GIFTS', String(cur + Math.max(0, Math.floor(n || 0))));
+    try { if (typeof refreshEconomyUI === 'function') refreshEconomyUI(); } catch (e) {}
+  }
+  function addCreditsSafe(n) {
+    try {
+      if (typeof window.addCredits === 'function') { window.addCredits(n); return; }
+    } catch (e) {}
+    var cur = Math.max(0, Math.floor(Number(sg('PRANA_SCHALE_CREDITS') || 0) || 0));
+    ss('PRANA_SCHALE_CREDITS', String(cur + Math.max(0, Math.floor(n || 0))));
+    try { if (typeof refreshEconomyUI === 'function') refreshEconomyUI(); } catch (e2) {}
+  }
+  function addPyroSafe(n) {
+    try {
+      if (typeof window.addPyroxene === 'function') { window.addPyroxene(n); return; }
+    } catch (e) {}
+    var cur = Math.max(0, Math.floor(Number(sg('PRANA_PYROXENE') || 0) || 0));
+    ss('PRANA_PYROXENE', String(Math.max(0, cur + Math.floor(n || 0))));
+    try { if (typeof refreshEconomyUI === 'function') refreshEconomyUI(); } catch (e2) {}
+  }
+
+  function updateEligmaUI() {
+    var n = getEligma();
+    ['gacha-eligma-display', 'eligma-shop-balance', 'setting-shop-eligma'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = String(n);
+    });
+  }
+
+  function injectGachaEligmaRow() {
+    var modal = document.getElementById('gacha-modal');
+    if (!modal || document.getElementById('gacha-eligma-row')) return;
+    var pyroRow = modal.querySelector('#gacha-pyroxene-display');
+    if (!pyroRow) return;
+    var parent = pyroRow.closest('div');
+    if (!parent || !parent.parentNode) return;
+    var row = document.createElement('div');
+    row.id = 'gacha-eligma-row';
+    row.style.cssText = 'display:flex;justify-content:space-between;font-size:13px;margin-top:4px;';
+    row.innerHTML = '<span>✨ 엘리그마</span><strong id="gacha-eligma-display">' + getEligma() + '</strong>';
+    parent.parentNode.insertBefore(row, parent.nextSibling);
+
+    var hint = document.createElement('p');
+    hint.id = 'gacha-eligma-hint';
+    hint.style.cssText = 'font-size:11px;color:#8a9bb0;margin:6px 0 0;line-height:1.45;';
+    hint.textContent = '이미 보유한 학생이 나오면 엘리그마로 변환됩니다. 메뉴 → 엘리그마 상점에서 환전·선물로 사용할 수 있습니다.';
+    row.parentNode.insertBefore(hint, row.nextSibling);
+
+    var desc = modal.querySelector('p');
+    if (desc && (desc.textContent || '').indexOf('중복 없음') >= 0) {
+      desc.innerHTML = '청휘석 120개로 1회, 1,200개로 10연 모집합니다.<br>이미 모집한 학생이 나오면 <strong>✨ 엘리그마</strong>로 변환됩니다.';
+    }
+  }
+
+  function getFullGachaPool() {
+    var pool = [];
+    var P = window.PERSONAS || {};
+    var ALWAYS = ['prana', 'arona'];
+    Object.keys(P).forEach(function (key) {
+      var p = P[key];
+      if (!p || p.isGroup) return;
+      if (p.hidden) return;
+      if (ALWAYS.indexOf(key) >= 0) return;
+      if (String(key).indexOf('custom_') === 0) return;
+      pool.push(key);
+    });
+    return pool;
+  }
+
+  function grantStudent(id) {
+    try {
+      var raw = sg('PRANA_OWNED_STUDENTS');
+      var arr = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(arr)) arr = [];
+      if (arr.indexOf(id) < 0) {
+        arr.push(id);
+        ss('PRANA_OWNED_STUDENTS', JSON.stringify(arr));
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  function isOwnedStudent(id) {
+    try {
+      if (typeof window.isStudentOwned === 'function') return window.isStudentOwned(id);
+    } catch (e) {}
+    try {
+      var raw = sg('PRANA_OWNED_STUDENTS');
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) && arr.indexOf(id) >= 0;
+    } catch (e2) { return false; }
+  }
+
+  var ELIGMA_PER_DUP = 15;
+
+  function resolvePull(pickId) {
+    var P = window.PERSONAS || {};
+    var persona = P[pickId] || { name: pickId, avatar: '?', sub: '' };
+    var owned = isOwnedStudent(pickId);
+    if (owned) {
+      addEligma(ELIGMA_PER_DUP);
+      return {
+        id: pickId,
+        persona: persona,
+        duplicate: true,
+        eligma: ELIGMA_PER_DUP,
+        message: '✨ 중복! ' + (persona.name || pickId) + ' → 엘리그마 +' + ELIGMA_PER_DUP
+      };
+    }
+    grantStudent(pickId);
+    return {
+      id: pickId,
+      persona: persona,
+      duplicate: false,
+      eligma: 0,
+      message: '🎉 ' + (persona.name || pickId) + ' 모집 성공!'
+    };
+  }
+
+  function hookGacha() {
+    if (typeof window.pullGacha === 'function' && !window.pullGacha.__v103) {
+      window.pullGacha = function () {
+        injectGachaEligmaRow();
+        var full = getFullGachaPool();
+        if (!full.length) {
+          alert('모집 가능한 학생이 없습니다.');
+          return;
+        }
+        var pyro = 0;
+        try { if (typeof getPyroxene === 'function') pyro = getPyroxene(); else pyro = Number(sg('PRANA_PYROXENE') || 0) || 0; } catch (e) {}
+        if (pyro < 120) {
+          alert('청휘석이 부족합니다. (필요: 120)');
+          return;
+        }
+        try {
+          if (typeof window.addPyroxene === 'function') window.addPyroxene(-120);
+          else ss('PRANA_PYROXENE', String(Math.max(0, pyro - 120)));
+        } catch (e) {}
+
+        var pickId = full[Math.floor(Math.random() * full.length)];
+        var result = resolvePull(pickId);
+        var persona = result.persona;
+
+        var idle = document.getElementById('gacha-idle');
+        var card = document.getElementById('gacha-card');
+        var avatar = document.getElementById('gacha-card-avatar');
+        var nameEl = document.getElementById('gacha-card-name');
+        var subEl = document.getElementById('gacha-card-sub');
+        var flash = document.getElementById('gacha-flash');
+        var msg = document.getElementById('gacha-msg');
+        var pullBtn = document.getElementById('gacha-pull-btn');
+        if (pullBtn) pullBtn.disabled = true;
+        if (idle) idle.style.display = 'none';
+        if (card) {
+          card.style.display = 'flex';
+          card.classList.remove('reveal');
+          card.classList.add('spinning');
+          if (avatar) avatar.textContent = '?';
+          if (nameEl) nameEl.textContent = '모집 중…';
+          if (subEl) subEl.textContent = '';
+        }
+        if (msg) { msg.style.color = 'var(--accent-color)'; msg.textContent = '학생을 모집하는 중…'; }
+
+        setTimeout(function () {
+          if (card) {
+            card.classList.remove('spinning');
+            card.classList.add('reveal');
+            if (avatar) avatar.textContent = persona.avatar || (result.duplicate ? '✨' : '?');
+            if (nameEl) nameEl.textContent = (result.duplicate ? '✨ ' : '') + (persona.name || pickId);
+            if (subEl) subEl.textContent = result.duplicate ? ('중복 → 엘리그마 +' + result.eligma) : (persona.sub || '');
+          }
+          if (flash) {
+            flash.classList.remove('on');
+            void flash.offsetWidth;
+            flash.classList.add('on');
+          }
+          if (msg) {
+            msg.style.color = result.duplicate ? '#fbbf24' : '#22c55e';
+            msg.textContent = result.message;
+          }
+          updateEligmaUI();
+          try { if (typeof filterCharacters === 'function') filterCharacters(); } catch (e) {}
+          try { if (typeof refreshEconomyUI === 'function') refreshEconomyUI(); } catch (e) {}
+          if (pullBtn) pullBtn.disabled = false;
+        }, 1400);
+      };
+      window.pullGacha.__v103 = true;
+    }
+
+    if (typeof window.pullGacha10 === 'function' && !window.pullGacha10.__v103) {
+      window.pullGacha10 = function () {
+        injectGachaEligmaRow();
+        var full = getFullGachaPool();
+        if (!full.length) { alert('모집 가능한 학생이 없습니다.'); return; }
+        var pyro = 0;
+        try { if (typeof getPyroxene === 'function') pyro = getPyroxene(); else pyro = Number(sg('PRANA_PYROXENE') || 0) || 0; } catch (e) {}
+        if (pyro < 1200) { alert('청휘석이 부족합니다. (필요: 1200)'); return; }
+        try {
+          if (typeof window.addPyroxene === 'function') window.addPyroxene(-1200);
+          else ss('PRANA_PYROXENE', String(Math.max(0, pyro - 1200)));
+        } catch (e) {}
+
+        var results = [];
+        var newCount = 0, dupCount = 0, eligmaTotal = 0;
+        for (var i = 0; i < 10; i++) {
+          var pickId = full[Math.floor(Math.random() * full.length)];
+          var r = resolvePull(pickId);
+          results.push(r);
+          if (r.duplicate) { dupCount++; eligmaTotal += r.eligma; }
+          else newCount++;
+        }
+
+        var msg = document.getElementById('gacha-msg');
+        var multi = document.getElementById('gacha-multi-list');
+        var idle = document.getElementById('gacha-idle');
+        var card = document.getElementById('gacha-card');
+        if (idle) idle.style.display = 'none';
+        if (card) card.style.display = 'none';
+        if (multi) {
+          multi.style.display = 'block';
+          multi.innerHTML = results.map(function (r) {
+            return '<div style="padding:6px 8px;border-bottom:1px solid var(--border-color);font-size:12px;">' +
+              (r.duplicate ? '✨ ' : '🎉 ') + (r.persona.name || r.id) +
+              (r.duplicate ? ' <span style="color:#fbbf24;">(+엘리그마 ' + r.eligma + ')</span>' : ' <span style="color:#22c55e;">NEW</span>') +
+              '</div>';
+          }).join('');
+        }
+        if (msg) {
+          msg.style.color = '#e0e6ed';
+          msg.textContent = '10연 결과 · NEW ' + newCount + ' · 중복 ' + dupCount + ' · 엘리그마 +' + eligmaTotal;
+        }
+        updateEligmaUI();
+        try { if (typeof filterCharacters === 'function') filterCharacters(); } catch (e) {}
+        try { if (typeof refreshEconomyUI === 'function') refreshEconomyUI(); } catch (e) {}
+      };
+      window.pullGacha10.__v103 = true;
+    }
+  }
+
+  function ensureEligmaModal() {
+    if (document.getElementById('eligma-shop-modal')) return;
+    var m = document.createElement('div');
+    m.className = 'modal';
+    m.id = 'eligma-shop-modal';
+    m.innerHTML =
+      '<div class="modal-content">' +
+      '<h3>✨ 엘리그마 상점</h3>' +
+      '<p style="font-size:12px;color:#8a9bb0;text-align:center;margin-bottom:10px;line-height:1.45;">가챠 중복 시 획득. 인연 선물로 쓰거나 청휘석·크레딧으로 환전할 수 있습니다.</p>' +
+      '<div style="display:flex;justify-content:space-between;padding:10px 12px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;margin-bottom:12px;font-size:13px;">' +
+      '<span>보유 엘리그마</span><strong id="eligma-shop-balance" style="color:var(--accent-color);">0</strong></div>' +
+      '<button type="button" class="menu-item-btn" onclick="window.v103ExchangeEligma && window.v103ExchangeEligma(\'gift\')">🎁 인연 선물 ×1 <span style="opacity:.75;font-size:12px;">(15 엘리그마)</span></button>' +
+      '<button type="button" class="menu-item-btn" onclick="window.v103ExchangeEligma && window.v103ExchangeEligma(\'gift5\')">🎁 인연 선물 ×5 <span style="opacity:.75;font-size:12px;">(70 엘리그마)</span></button>' +
+      '<button type="button" class="menu-item-btn" onclick="window.v103ExchangeEligma && window.v103ExchangeEligma(\'pyro\')">💎 청휘석 ×20 <span style="opacity:.75;font-size:12px;">(40 엘리그마)</span></button>' +
+      '<button type="button" class="menu-item-btn" onclick="window.v103ExchangeEligma && window.v103ExchangeEligma(\'credit\')">🪙 크레딧 ×50 <span style="opacity:.75;font-size:12px;">(25 엘리그마)</span></button>' +
+      '<p id="eligma-shop-msg" style="font-size:12px;text-align:center;min-height:18px;margin:10px 0;color:var(--accent-color);"></p>' +
+      '<button type="button" class="main-btn" onclick="document.getElementById(\'eligma-shop-modal\').style.display=\'none\'">닫기</button>' +
+      '</div>';
+    document.body.appendChild(m);
+    m.addEventListener('click', function (ev) { if (ev.target === m) m.style.display = 'none'; });
+  }
+
+  window.v103ExchangeEligma = function (kind) {
+    var cost = 0, label = '';
+    if (kind === 'gift') { cost = 15; label = '인연 선물 ×1'; }
+    else if (kind === 'gift5') { cost = 70; label = '인연 선물 ×5'; }
+    else if (kind === 'pyro') { cost = 40; label = '청휘석 ×20'; }
+    else if (kind === 'credit') { cost = 25; label = '크레딧 ×50'; }
+    else return;
+    if (getEligma() < cost) {
+      var msg = document.getElementById('eligma-shop-msg');
+      if (msg) { msg.style.color = '#f87171'; msg.textContent = '엘리그마가 부족합니다.'; }
+      return;
+    }
+    addEligma(-cost);
+    if (kind === 'gift') addGifts(1);
+    else if (kind === 'gift5') addGifts(5);
+    else if (kind === 'pyro') addPyroSafe(20);
+    else if (kind === 'credit') addCreditsSafe(50);
+    var msg2 = document.getElementById('eligma-shop-msg');
+    if (msg2) { msg2.style.color = '#22c55e'; msg2.textContent = label + ' 교환 완료!'; }
+    updateEligmaUI();
+  };
+
+  window.openEligmaShop = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    ensureEligmaModal();
+    updateEligmaUI();
+    var m = document.getElementById('eligma-shop-modal');
+    if (m) m.style.display = 'flex';
+  };
+
+  function ensureExtraMissionDay() {
+    var sid = baseSeasonId(), t = todayStr();
+    if (sg(K.smSeason) !== sid || sg(K.smDate) !== t) {
+      ss(K.smSeason, sid);
+      ss(K.smDate, t);
+      saveJSON(K.smProg, {});
+      saveJSON(K.smClaim, {});
+    }
+  }
+  function trackExtraSeason(kind, amount) {
+    ensureExtraMissionDay();
+    var prog = loadJSON(K.smProg, {});
+    var add = amount || 1;
+    var changed = false;
+    EXTRA_MISSIONS.forEach(function (m) {
+      if (m.track !== kind) return;
+      var cur = Number(prog[m.id]) || 0;
+      if (cur >= m.target) return;
+      prog[m.id] = Math.min(m.target, cur + add);
+      changed = true;
+    });
+    if (changed) saveJSON(K.smProg, prog);
+  }
+  window.v103TrackSeasonCosmetic = trackExtraSeason;
+
+  function applyPassXp(n) {
+    try {
+      var xp = Math.max(0, Math.floor(Number(sg('PRANA_V10_PASS_XP') || 0) || 0)) + Math.max(0, Math.floor(n || 0));
+      ss('PRANA_V10_PASS_XP', String(xp));
+    } catch (e) {}
+  }
+
+  window.v103ClaimExtraMission = function (id) {
+    ensureExtraMissionDay();
+    var def = null;
+    for (var i = 0; i < EXTRA_MISSIONS.length; i++) if (EXTRA_MISSIONS[i].id === id) def = EXTRA_MISSIONS[i];
+    if (!def) return;
+    var prog = loadJSON(K.smProg, {});
+    var claimed = loadJSON(K.smClaim, {});
+    if (claimed[id]) return;
+    if ((Number(prog[id]) || 0) < def.target) { alert('아직 완료하지 않았습니다.'); return; }
+    claimed[id] = true;
+    saveJSON(K.smClaim, claimed);
+    var r = def.reward || {};
+    var parts = [];
+    if (r.credits) { addCreditsSafe(r.credits); parts.push('크레딧 +' + r.credits); }
+    if (r.gifts) { addGifts(r.gifts); parts.push('선물 +' + r.gifts); }
+    if (r.passXp) { applyPassXp(r.passXp); parts.push('패스XP +' + r.passXp); }
+    alert('시즌 미션 클리어!\n' + def.title + '\n' + parts.join(' · '));
+    injectExtraMissionsIntoHub();
+  };
+
+  function injectExtraMissionsIntoHub() {
+    var body = document.getElementById('v10-hub-body');
+    if (!body) return;
+    ensureExtraMissionDay();
+    var wrap = document.getElementById('v103-extra-missions');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'v103-extra-missions';
+      body.appendChild(wrap);
+    }
+    var prog = loadJSON(K.smProg, {});
+    var claimed = loadJSON(K.smClaim, {});
+    var html = '<div class="v10-card" style="margin-top:4px;"><h4>시즌 패스 코스메틱 미션</h4><div class="v10-meta">스탬프·배경·BGM을 실제로 쓰면 진행됩니다.</div></div>';
+    EXTRA_MISSIONS.forEach(function (m) {
+      var cur = Math.min(m.target, Number(prog[m.id]) || 0);
+      var done = cur >= m.target;
+      var isClaimed = !!claimed[m.id];
+      html += '<div class="v10-card">' +
+        '<h4>' + m.icon + ' ' + m.title + ' <span style="float:right;font-size:12px;color:var(--accent-color);">' + cur + '/' + m.target + '</span></h4>' +
+        '<div class="v10-meta">' + m.desc + '</div>' +
+        '<div class="v10-rew">' +
+        (m.reward.credits ? '크레딧 ' + m.reward.credits + ' ' : '') +
+        (m.reward.gifts ? '선물 ' + m.reward.gifts + ' ' : '') +
+        (m.reward.passXp ? '패스XP ' + m.reward.passXp : '') +
+        '</div>';
+      if (isClaimed) html += '<button type="button" class="v10-btn" disabled>수령 완료</button>';
+      else if (done) html += '<button type="button" class="v10-btn" onclick="window.v103ClaimExtraMission(\'' + m.id + '\')">보상 받기</button>';
+      else html += '<button type="button" class="v10-btn gray" disabled>진행 중…</button>';
+      html += '</div>';
+    });
+    wrap.innerHTML = html;
+  }
+
+  function hookSeasonCosmeticUsage() {
+    if (typeof window.openStampModal === 'function' && !window.openStampModal.__v103) {
+      var os = window.openStampModal;
+      window.openStampModal = function () {
+        var r = os.apply(this, arguments);
+        setTimeout(function () {
+          var grid = document.getElementById('v102-season-stamp-grid');
+          if (!grid || grid.__v103) return;
+          grid.__v103 = true;
+          grid.addEventListener('click', function (ev) {
+            var btn = ev.target.closest('.stamp-option');
+            if (!btn || btn.style.pointerEvents === 'none') return;
+            setTimeout(function () { trackExtraSeason('season_stamp', 1); }, 30);
+          });
+        }, 60);
+        return r;
+      };
+      window.openStampModal.__v103 = true;
+    }
+
+    if (typeof window.openRoomModal === 'function' && !window.openRoomModal.__v103) {
+      var or = window.openRoomModal;
+      window.openRoomModal = function () {
+        var r = or.apply(this, arguments);
+        setTimeout(function () {
+          var wrap = document.getElementById('v102-season-room-wrap');
+          if (!wrap || wrap.__v103) return;
+          wrap.__v103 = true;
+          wrap.addEventListener('click', function (ev) {
+            var card = ev.target.closest('[data-v102-room]');
+            if (!card) return;
+            var id = card.getAttribute('data-v102-room') || '';
+            if (id.indexOf('season_') === 0) {
+              setTimeout(function () {
+                var cur = sg('PRANA_CHAT_BG') || '';
+                if (cur === id) trackExtraSeason('season_room', 1);
+              }, 50);
+            }
+          });
+        }, 60);
+        return r;
+      };
+      window.openRoomModal.__v103 = true;
+    }
+
+    if (!window.__v103BgmHook) {
+      window.__v103BgmHook = true;
+      var prev = localStorage.getItem('PRANA_V102_SEASON_BGM_ON') || '0';
+      setInterval(function () {
+        try {
+          var now = localStorage.getItem('PRANA_V102_SEASON_BGM_ON') || '0';
+          if (now === '1' && prev !== '1') trackExtraSeason('season_bgm', 1);
+          prev = now;
+        } catch (e) {}
+      }, 1500);
+    }
+  }
+
+  function hookHubForMissions() {
+    if (typeof window.__v10Render === 'function' && !window.__v10Render.__v103) {
+      var o = window.__v10Render;
+      window.__v10Render = function (tab) {
+        var r = o.apply(this, arguments);
+        if (tab === 'sm') setTimeout(injectExtraMissionsIntoHub, 50);
+        return r;
+      };
+      window.__v10Render.__v103 = true;
+    }
+  }
+
+  function getStampMode() {
+    var m = sg(K.stampMode) || 'all';
+    if (m !== 'season' && m !== 'base') m = 'all';
+    return m;
+  }
+  function setStampMode(m) {
+    if (m !== 'season' && m !== 'base') m = 'all';
+    ss(K.stampMode, m);
+    applyStampModeUI();
+  }
+  function applyStampModeUI() {
+    var mode = getStampMode();
+    var baseGrid = document.getElementById('stamp-grid');
+    var seasonWrap = document.getElementById('v102-season-stamp-wrap');
+    if (baseGrid) {
+      if (mode === 'season') baseGrid.style.display = 'none';
+      else baseGrid.style.display = '';
+    }
+    if (seasonWrap) {
+      if (mode === 'base') seasonWrap.style.display = 'none';
+      else seasonWrap.style.display = '';
+    }
+    var bar = document.getElementById('v103-stamp-mode-bar');
+    if (bar) {
+      bar.querySelectorAll('[data-stamp-mode]').forEach(function (b) {
+        if (b.getAttribute('data-stamp-mode') === mode) {
+          b.style.borderColor = 'var(--accent-color)';
+          b.style.background = 'var(--accent-color)';
+          b.style.color = '#fff';
+        } else {
+          b.style.borderColor = 'var(--border-color)';
+          b.style.background = 'var(--bg-color)';
+          b.style.color = 'var(--text-color)';
+        }
+      });
+    }
+  }
+  function injectStampModeBar() {
+    var grid = document.getElementById('stamp-grid');
+    if (!grid || document.getElementById('v103-stamp-mode-bar')) return;
+    var bar = document.createElement('div');
+    bar.id = 'v103-stamp-mode-bar';
+    bar.style.cssText = 'display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;';
+    [['all', '전체'], ['season', '시즌만'], ['base', '기본만']].forEach(function (pair) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.setAttribute('data-stamp-mode', pair[0]);
+      btn.textContent = pair[1];
+      btn.style.cssText = 'padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid var(--border-color);background:var(--bg-color);color:var(--text-color);cursor:pointer;';
+      btn.onclick = function () { setStampMode(pair[0]); };
+      bar.appendChild(btn);
+    });
+    grid.parentNode.insertBefore(bar, grid);
+    applyStampModeUI();
+  }
+  function hookStampMode() {
+    if (typeof window.openStampModal === 'function' && !window.openStampModal.__v103mode) {
+      var o = window.openStampModal;
+      window.openStampModal = function () {
+        var r = o.apply(this, arguments);
+        setTimeout(function () { injectStampModeBar(); applyStampModeUI(); }, 40);
+        return r;
+      };
+      if (o.__v103) window.openStampModal.__v103 = true;
+      window.openStampModal.__v103mode = true;
+    }
+  }
+
+  function slotKey() {
+    return String(Math.floor(Date.now() / (2 * 60 * 60 * 1000)));
+  }
+  function remainingMs() {
+    var slot = Math.floor(Date.now() / (2 * 60 * 60 * 1000));
+    var end = (slot + 1) * 2 * 60 * 60 * 1000;
+    return Math.max(0, end - Date.now());
+  }
+  function formatRemain(ms) {
+    var s = Math.floor(ms / 1000);
+    var h = Math.floor(s / 3600);
+    var m = Math.floor((s % 3600) / 60);
+    var sec = s % 60;
+    return h + '시간 ' + m + '분 ' + sec + '초';
+  }
+  function hashStr(s) {
+    var h = 0;
+    for (var i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i) | 0;
+    return h;
+  }
+  function seededPick(seed, arr) {
+    var x = Math.abs(hashStr(seed)) % 2147483647;
+    if (x === 0) x = 1;
+    x = (x * 48271) % 2147483647;
+    return arr[x % arr.length];
+  }
+  function getShopOffer() {
+    var slot = slotKey();
+    var cached = loadJSON(K.settingShop, null);
+    if (cached && cached.slot === slot && cached.offer) return cached.offer;
+    var type = (hashStr(slot + '_type') % 2 === 0) ? 'room' : 'code';
+    var offer;
+    if (type === 'room') {
+      var room = seededPick(slot + '_room', SELLABLE_ROOMS);
+      offer = {
+        type: 'room',
+        id: 'room_' + room.id,
+        roomId: room.id,
+        name: '🖼️ ' + room.name,
+        desc: '대화 배경 해금 (영구)',
+        costCredits: 60,
+        costPyro: 0
+      };
+    } else {
+      var code = seededPick(slot + '_code', SECRET_SHEET_CODES);
+      offer = {
+        type: 'code',
+        id: 'code_' + hashStr(code),
+        code: code,
+        name: '📜 비밀 코드 확인서',
+        desc: '1회용 · 구매 시 코드 내용이 공개됩니다',
+        costCredits: 1200,
+        costPyro: 0
+      };
+    }
+    saveJSON(K.settingShop, { slot: slot, offer: offer });
+    return offer;
+  }
+  function isOfferBought(offer) {
+    var bought = loadJSON(K.settingBought, {});
+    return !!bought[slotKey() + '_' + offer.id];
+  }
+  function markOfferBought(offer) {
+    var bought = loadJSON(K.settingBought, {});
+    bought[slotKey() + '_' + offer.id] = true;
+    var keys = Object.keys(bought);
+    if (keys.length > 40) {
+      keys.sort();
+      keys.slice(0, keys.length - 30).forEach(function (k) { delete bought[k]; });
+    }
+    saveJSON(K.settingBought, bought);
+  }
+
+  function ensureSettingShopModal() {
+    if (document.getElementById('setting-shop-modal')) return;
+    var m = document.createElement('div');
+    m.className = 'modal';
+    m.id = 'setting-shop-modal';
+    m.innerHTML =
+      '<div class="modal-content">' +
+      '<h3>🛒 설정 상점</h3>' +
+      '<p style="font-size:12px;color:#8a9bb0;text-align:center;margin-bottom:8px;line-height:1.45;">2시간마다 상품이 교체됩니다. 비밀 코드 확인서는 구매 시 코드가 공개됩니다.</p>' +
+      '<div id="setting-shop-timer" style="text-align:center;font-size:12px;color:var(--accent-color);font-weight:700;margin-bottom:10px;">교체까지 —</div>' +
+      '<div id="setting-shop-body"></div>' +
+      '<div style="margin-top:10px;padding:10px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;font-size:12px;">' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>🪙 크레딧</span><strong id="setting-shop-credits">0</strong></div>' +
+      '<div style="display:flex;justify-content:space-between;"><span>✨ 엘리그마</span><strong id="setting-shop-eligma">0</strong></div>' +
+      '</div>' +
+      '<p id="setting-shop-msg" style="font-size:12px;text-align:center;min-height:18px;margin:10px 0;color:var(--accent-color);"></p>' +
+      '<button type="button" class="main-btn" onclick="document.getElementById(\'setting-shop-modal\').style.display=\'none\'">닫기</button>' +
+      '</div>';
+    document.body.appendChild(m);
+    m.addEventListener('click', function (ev) { if (ev.target === m) m.style.display = 'none'; });
+  }
+
+  function renderSettingShop() {
+    ensureSettingShopModal();
+    var offer = getShopOffer();
+    var body = document.getElementById('setting-shop-body');
+    var timer = document.getElementById('setting-shop-timer');
+    var creditsEl = document.getElementById('setting-shop-credits');
+    var eligmaEl = document.getElementById('setting-shop-eligma');
+    if (timer) timer.textContent = '다음 교체까지 ' + formatRemain(remainingMs());
+    var credits = Math.max(0, Math.floor(Number(sg('PRANA_SCHALE_CREDITS') || 0) || 0));
+    if (creditsEl) creditsEl.textContent = String(credits);
+    if (eligmaEl) eligmaEl.textContent = String(getEligma());
+    if (!body) return;
+    var bought = isOfferBought(offer);
+    body.innerHTML =
+      '<div class="v10-card" style="margin:0;">' +
+      '<h4>' + offer.name + '</h4>' +
+      '<div class="v10-meta">' + offer.desc + '</div>' +
+      '<div class="v10-rew" style="margin:8px 0;">가격: 🪙 ' + offer.costCredits + ' 크레딧</div>' +
+      (bought
+        ? '<button type="button" class="v10-btn" disabled>이번 회차 구매 완료</button>'
+        : '<button type="button" class="v10-btn" onclick="window.v103BuySettingOffer()">구매하기</button>') +
+      '</div>';
+  }
+
+  window.v103BuySettingOffer = function () {
+    var offer = getShopOffer();
+    if (isOfferBought(offer)) {
+      alert('이미 이번 회차 상품을 구매했습니다.');
+      return;
+    }
+    var credits = Math.max(0, Math.floor(Number(sg('PRANA_SCHALE_CREDITS') || 0) || 0));
+    if (credits < offer.costCredits) {
+      var msg = document.getElementById('setting-shop-msg');
+      if (msg) { msg.style.color = '#f87171'; msg.textContent = '크레딧이 부족합니다.'; }
+      return;
+    }
+    ss('PRANA_SCHALE_CREDITS', String(credits - offer.costCredits));
+    markOfferBought(offer);
+
+    if (offer.type === 'room') {
+      try {
+        if (typeof window.unlockChatRoom === 'function') window.unlockChatRoom(offer.roomId, false);
+        else {
+          var ok = localStorage.getItem('PRANA_OWNED_ROOMS');
+          var arr = ok ? JSON.parse(ok) : [];
+          if (!Array.isArray(arr)) arr = [];
+          if (arr.indexOf(offer.roomId) < 0) {
+            arr.push(offer.roomId);
+            localStorage.setItem('PRANA_OWNED_ROOMS', JSON.stringify(arr));
+          }
+        }
+      } catch (e) {}
+      alert('배경「' + offer.name.replace(/^🖼️\s*/, '') + '」해금!\n배경 꾸미기 메뉴에서 적용할 수 있습니다.');
+    } else if (offer.type === 'code') {
+      var revealed = loadJSON(K.revealedCodes, {});
+      revealed[offer.code] = true;
+      saveJSON(K.revealedCodes, revealed);
+      alert('📜 비밀 코드 확인서\n\n공개된 코드:\n「' + offer.code + '」\n\n메뉴 → 비밀 코드 입력에서 사용해 주세요.\n(이미 사용한 코드면 보상을 받을 수 없습니다)');
+    }
+    try { if (typeof refreshEconomyUI === 'function') refreshEconomyUI(); } catch (e) {}
+    renderSettingShop();
+  };
+
+  window.openSettingShop = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    renderSettingShop();
+    var m = document.getElementById('setting-shop-modal');
+    if (m) m.style.display = 'flex';
+  };
+
+  function injectMenu() {
+    var list = document.querySelector('#main-menu-modal .menu-list');
+    if (!list) return;
+    function ensure(id, label, onClick, search) {
+      var b = document.getElementById(id);
+      if (b) { b.onclick = onClick; return; }
+      b = document.createElement('button');
+      b.type = 'button';
+      b.id = id;
+      b.className = 'menu-item-btn';
+      b.textContent = label;
+      if (search) b.setAttribute('data-search', search);
+      b.onclick = onClick;
+      var gacha = Array.from(list.querySelectorAll('.menu-item-btn')).find(function (el) {
+        return (el.textContent || '').indexOf('학생 모집 가챠') >= 0;
+      });
+      if (gacha) list.insertBefore(b, gacha.nextSibling);
+      else list.appendChild(b);
+    }
+    ensure('v103-eligma-menu', '✨ 엘리그마 상점', function () { window.openEligmaShop(); }, '엘리그마 eligma 중복 환전 선물');
+    ensure('v103-setting-shop-menu', '🛒 설정 상점', function () { window.openSettingShop(); }, '설정 상점 setting shop 배경 비밀코드 확인서');
+  }
+
+  function boot() {
+    injectMenu();
+    injectGachaEligmaRow();
+    hookGacha();
+    hookSeasonCosmeticUsage();
+    hookHubForMissions();
+    hookStampMode();
+    updateEligmaUI();
+    setInterval(function () {
+      injectMenu();
+      injectGachaEligmaRow();
+      hookGacha();
+      hookSeasonCosmeticUsage();
+      hookHubForMissions();
+      hookStampMode();
+      updateEligmaUI();
+      var timer = document.getElementById('setting-shop-timer');
+      if (timer && document.getElementById('setting-shop-modal') && document.getElementById('setting-shop-modal').style.display === 'flex') {
+        timer.textContent = '다음 교체까지 ' + formatRemain(remainingMs());
+      }
+    }, 2500);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+  window.v103 = {
+    getEligma: getEligma,
+    addEligma: addEligma,
+    getShopOffer: getShopOffer,
+    EXTRA_MISSIONS: EXTRA_MISSIONS
+  };
 })();
 </script>
 
