@@ -16933,14 +16933,16 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
 
 
 <script>
-/* 제작자 치트 수신기 — 제작자 패널에서 보낸 전체 지급·공지 메시지를 받아 적용합니다.
-   CREATOR_DB_URL 에 Firebase Realtime Database 주소를 넣으세요.
-   예) 'https://내프로젝트-default-rtdb.firebaseio.com'   (비워두면 이 기능은 꺼집니다)
-   ※ 이 주소는 읽기 전용으로만 쓰이고, 제작자 비밀번호는 이 파일에 들어있지 않습니다. */
+/* 제작자 치트 수신기 — 제작자 패널이 GitHub 저장소의 cheat.json 에 적어 둔 명령(전체 지급·공지)을 확인해서 적용합니다.
+   CREATOR_GH_REPO 에 '사용자이름/저장소이름' 을 넣으세요.   예) 'elloyeeh895-web/저장소이름'
+   (비워두면 이 기능은 꺼집니다. 토큰은 이 파일에 들어있지 않고, 저장소는 Public 이어야 합니다.) */
 (function () {
-  var CREATOR_DB_URL = '';
+  var CREATOR_GH_REPO = '';
+  var GH_API = 'https://api.github.com';
+  var POLL_MS = 20000;          // 확인 주기 (변경이 없으면 GitHub 사용량에 포함되지 않음)
+  var BACKOFF_MS = 180000;      // 요청 제한(403/429) 시 쉬는 시간
 
-  if (!CREATOR_DB_URL) return;
+  if (!/^[^\/\s]+\/[^\/\s]+$/.test(CREATOR_GH_REPO)) return;
   var SEEN_KEY = 'PRANA_CREATOR_SEEN';
   var LABELS = { credits: '🪙 크레딧', pyroxene: '💎 청휘석', tickets: '🎫 인연 티켓', gifts: '🎁 인연 선물', eligma: '✨ 엘리그마' };
 
@@ -17020,30 +17022,38 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
     }
   }
 
-  function onPut(ev) {
-    var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-    if (!m || typeof m.path !== 'string') return;
-    if (m.path === '/') {                               // 접속(재접속) 직후의 기존 기록 → 지급하지 않고 "이미 본 것"으로만 표시
-      var d = m.data;
-      if (d && typeof d === 'object') {
+  var first = true;
+
+  function poll() {
+    var delay = POLL_MS;
+    if (typeof document !== 'undefined' && document.hidden) return setTimeout(poll, POLL_MS);   // 화면이 꺼져 있으면 건너뜀
+    fetch(GH_API + '/repos/' + CREATOR_GH_REPO + '/contents/cheat.json', {
+      cache: 'no-cache',                                             // 항상 "바뀌었나요?" 확인 → 안 바뀌면 304
+      headers: { 'Accept': 'application/vnd.github.raw+json' }
+    }).then(function (r) {
+      if (r.status === 404) return '';                               // 아직 cheat.json 이 없음
+      if (r.status === 403 || r.status === 429) { delay = BACKOFF_MS; throw new Error('rate'); }
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.text();
+    }).then(function (txt) {
+      var entries = [];
+      if (txt) { try { var d = JSON.parse(txt); if (d && Array.isArray(d.entries)) entries = d.entries; } catch (e) {} }
+      if (first) {                                                   // 접속 직후: 이미 있던 명령은 지급하지 않고 "본 것"으로만 표시
+        first = false;
         var l = seen();
-        Object.keys(d).forEach(function (k) { known[k] = 1; if (l.indexOf(k) < 0) l.push(k); });
+        entries.forEach(function (e) { if (e && e.id) { known[e.id] = 1; if (l.indexOf(e.id) < 0) l.push(e.id); } });
         ss(SEEN_KEY, JSON.stringify(l.slice(-50)));
+        return;
       }
-      return;
-    }
-    var parts = m.path.split('/');                      // '/-Nabc' = 새 명령 1개
-    if (parts.length !== 2 || !parts[1]) return;
-    if (known[parts[1]]) return;
-    known[parts[1]] = 1;
-    handleEntry(parts[1], m.data);
+      entries.slice().sort(function (x, y) { return (x.ts || 0) - (y.ts || 0); }).forEach(function (e) {
+        if (!e || typeof e.id !== 'string' || known[e.id]) return;
+        known[e.id] = 1;
+        handleEntry(e.id, e);
+      });
+    }).catch(function () {}).then(function () { setTimeout(poll, delay); });
   }
 
-  function connect() {
-    if (typeof EventSource === 'undefined') return;
-    var es = new EventSource(CREATOR_DB_URL.replace(/\/+$/, '') + '/cheat/log.json');
-    es.addEventListener('put', onPut);                  // 끊기면 브라우저가 자동 재연결
-  }
+  function connect() { poll(); }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', connect);
   else connect();
