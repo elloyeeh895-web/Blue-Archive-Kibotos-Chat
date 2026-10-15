@@ -16940,27 +16940,56 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
 
 
 <script>
-/* 제작자 치트 수신기 — 제작자 패널이 GitHub 저장소의 cheat.json 에 적어 둔 명령(전체 지급·공지)을 확인해서 적용합니다.
-   CREATOR_GH_REPO 에 '사용자이름/저장소이름' 을 넣으세요.   예) 'elloyeeh895-web/저장소이름'
-   (비워두면 이 기능은 꺼집니다. 토큰은 이 파일에 들어있지 않고, 저장소는 Public 이어야 합니다.) */
+/* 제작자 치트 수신기 — cheat.json 폴링 후 미적용 명령만 1회 적용
+   · 최근 60분 이내 항목: 앱을 나중에 열어도 적용
+   · 그 이전 항목: 중복 지급 방지를 위해 스킵만
+   · SEEN 키로 기기별 1회 보장 */
 (function () {
   var CREATOR_GH_REPO = 'elloyeeh895-web/Blue-Archive-Kibotos-Chat';
   var GH_API = 'https://api.github.com';
-  var POLL_MS = 20000;          // 확인 주기 (변경이 없으면 GitHub 사용량에 포함되지 않음)
-  var BACKOFF_MS = 180000;      // 요청 제한(403/429) 시 쉬는 시간
+  var POLL_MS = 10000;
+  var BACKOFF_MS = 120000;
+  var RECENT_MS = 24 * 60 * 60 * 1000;  // 24시간 이내 명령은 늦게 접속해도 적용
+  var SEEN_KEY = 'PRANA_CREATOR_SEEN';
+  var LABELS = {
+    credits: '🪙 크레딧', pyroxene: '💎 청휘석', tickets: '🎫 인연 티켓',
+    gifts: '🎁 인연 선물', eligma: '✨ 엘리그마', streak: '🛡️ 연속 지키기권'
+  };
+  var VALID = { credits: 1, pyroxene: 1, tickets: 1, gifts: 1, eligma: 1, streak: 1 };
 
   if (!/^[^\/\s]+\/[^\/\s]+$/.test(CREATOR_GH_REPO)) return;
-  var SEEN_KEY = 'PRANA_CREATOR_SEEN';
-  var LABELS = { credits: '🪙 크레딧', pyroxene: '💎 청휘석', tickets: '🎫 인연 티켓', gifts: '🎁 인연 선물', eligma: '✨ 엘리그마', streak: '🛡️ 연속 지키기권' };
 
-  function sg(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return (typeof safeGet === 'function') ? safeGet(k) : ''; } }
-  function ss(k, v) { try { localStorage.setItem(k, v); } catch (e) { if (typeof safeSet === 'function') safeSet(k, v); } }
+  function sg(k) {
+    try { return localStorage.getItem(k) || ''; } catch (e) {
+      return (typeof safeGet === 'function') ? (safeGet(k) || '') : '';
+    }
+  }
+  function ss(k, v) {
+    try { localStorage.setItem(k, String(v)); } catch (e) {
+      if (typeof safeSet === 'function') safeSet(k, String(v));
+    }
+  }
+  function loadSeen() {
+    try {
+      var a = JSON.parse(sg(SEEN_KEY) || '[]');
+      return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+  }
+  function saveSeen(list) {
+    var uniq = [];
+    var map = {};
+    (list || []).forEach(function (id) {
+      if (!id || map[id]) return;
+      map[id] = 1;
+      uniq.push(id);
+    });
+    ss(SEEN_KEY, JSON.stringify(uniq.slice(-120)));
+  }
   function addKey(key, n, def) {
     var raw = sg(key);
     var cur = raw === '' ? (def || 0) : Math.max(0, Math.floor(Number(raw) || 0));
-    ss(key, String(cur + n));
+    ss(key, String(cur + Math.max(0, Math.floor(n || 0))));
   }
-  function seen() { try { return JSON.parse(sg(SEEN_KEY) || '[]'); } catch (e) { return []; } }
 
   function toast(text) {
     var d = document.createElement('div');
@@ -16971,7 +17000,6 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
     setTimeout(function () { d.remove(); }, 3800);
   }
 
-  // ===== 제작자 메시지 (every.m) : 화면 위쪽 배너, 여러 개면 순서대로 표시 =====
   var noticeQueue = [], noticeShowing = false;
   function showNextNotice() {
     if (noticeShowing || !noticeQueue.length) return;
@@ -16984,16 +17012,19 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
     tag.textContent = '📢 제작자 공지';
     tag.style.cssText = 'font-size:11px;opacity:.8;margin-bottom:4px';
     var body = document.createElement('div');
-    body.textContent = text;                 // textContent: 메시지 안의 HTML 은 실행되지 않음
+    body.textContent = text;
     d.appendChild(tag); d.appendChild(body);
     document.body.appendChild(d);
-    requestAnimationFrame(function () { requestAnimationFrame(function () { d.style.transform = 'translate(-50%,0)'; }); });
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { d.style.transform = 'translate(-50%,0)'; });
+    });
     setTimeout(function () { d.style.transform = 'translate(-50%,-120%)'; }, 6000);
     setTimeout(function () { d.remove(); noticeShowing = false; showNextNotice(); }, 6500);
   }
-  function apply(g) {
+
+  function applyGrant(g) {
     var n = Math.floor(Number(g.amount));
-    if (!isFinite(n) || n <= 0 || n > 99999999) return;
+    if (!isFinite(n) || n <= 0 || n > 99999999) return false;
     switch (g.currency) {
       case 'credits': addKey('PRANA_SCHALE_CREDITS', n, 0); break;
       case 'pyroxene':
@@ -17004,100 +17035,150 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
       case 'gifts': addKey('PRANA_BOND_GIFTS', n, 0); break;
       case 'eligma':
         if (window.v103 && typeof window.v103.addEligma === 'function') window.v103.addEligma(n);
+        else if (typeof window.addEligma === 'function') window.addEligma(n);
         else addKey('PRANA_V103_ELIGMA', n, 0);
         break;
       case 'streak':
         addKey('PRANA_V94_STREAK_PROTECT', n, 0);
         try { if (typeof window.refreshStreakProtectUI === 'function') window.refreshStreakProtectUI(); } catch (e) {}
         break;
-      default: return;
+      default: return false;
     }
     try { if (typeof window.refreshEconomyUI === 'function') window.refreshEconomyUI(); } catch (e) {}
-    toast('🛠 제작자 선물! ' + LABELS[g.currency] + ' +' + n.toLocaleString());
+    toast('🛠 제작자 선물! ' + (LABELS[g.currency] || g.currency) + ' +' + n.toLocaleString());
+    return true;
   }
 
-  var VALID = { credits: 1, pyroxene: 1, tickets: 1, gifts: 1, eligma: 1, streak: 1 };
-  var known = {};
-  // 최근 이 시간 안의 명령은 앱을 나중에 열어도 적용 (밀리초). 너무 오래된 히스토리는 지급 안 함.
-  var RECENT_MS = 30 * 60 * 1000;
-
-  function handleEntry(key, e) {
-    if (!e || typeof e !== 'object') return;
-    var list = seen();
-    if (list.indexOf(key) >= 0) return;                 // 같은 명령 중복 지급 방지
-    list.push(key);
-    ss(SEEN_KEY, JSON.stringify(list.slice(-80)));
-    if (e.type === 'notice' && typeof e.text === 'string' && e.text) {
-      noticeQueue.push(e.text.slice(0, 200));
+  function applyEntry(e) {
+    if (!e || typeof e !== 'object') return false;
+    if (e.type === 'notice' && typeof e.text === 'string' && e.text.trim()) {
+      noticeQueue.push(String(e.text).slice(0, 200));
       showNextNotice();
-    } else if (e.type === 'grant' && VALID[e.currency]) {
-      apply({ currency: e.currency, amount: e.amount });
+      return true;
     }
+    if (e.type === 'grant' && VALID[e.currency]) {
+      return applyGrant({ currency: e.currency, amount: e.amount });
+    }
+    return false;
   }
 
-  var first = true;
+  var sessionApplied = {};
+  var bootstrapped = false;
 
   function processEntries(entries) {
+    if (!Array.isArray(entries)) return;
     var now = Date.now();
-    var sorted = entries.slice().sort(function (x, y) { return (x.ts || 0) - (y.ts || 0); });
-    if (first) {
-      first = false;
-      var l = seen();
-      sorted.forEach(function (e) {
-        if (!e || typeof e.id !== 'string') return;
-        var ts = Number(e.ts) || 0;
-        var isRecent = ts > 0 && (now - ts) <= RECENT_MS && (now - ts) >= -60000;
-        if (isRecent && l.indexOf(e.id) < 0) {
-          // 최근 30분 이내 명령: 늦게 접속해도 1회 적용
-          known[e.id] = 1;
-          handleEntry(e.id, e);
-        } else {
-          known[e.id] = 1;
-          if (l.indexOf(e.id) < 0) l.push(e.id);
-        }
-      });
-      ss(SEEN_KEY, JSON.stringify(l.slice(-80)));
-      return;
-    }
+    var seen = loadSeen();
+    var seenMap = {};
+    seen.forEach(function (id) { seenMap[id] = 1; });
+    var changed = false;
+
+    var sorted = entries.slice().sort(function (a, b) {
+      return (Number(a && a.ts) || 0) - (Number(b && b.ts) || 0);
+    });
+
     sorted.forEach(function (e) {
-      if (!e || typeof e.id !== 'string' || known[e.id]) return;
-      known[e.id] = 1;
-      handleEntry(e.id, e);
+      if (!e || typeof e.id !== 'string' || !e.id) return;
+      if (seenMap[e.id] || sessionApplied[e.id]) return;
+
+      var ts = Number(e.ts) || 0;
+      var age = ts > 0 ? (now - ts) : 0;
+      // ts 가 없거나 시계 오차 허용. 부트스트랩(첫 폴링)에서는 오래된 것만 스킵
+      var tooOld = false;
+      if (!bootstrapped) {
+        if (ts > 0 && age > RECENT_MS) tooOld = true;
+        // ts 가 미래로 크게 틀어져 있어도 최근으로 취급
+        if (ts > 0 && age < -5 * 60 * 1000) tooOld = false;
+      }
+
+      if (tooOld) {
+        seenMap[e.id] = 1;
+        seen.push(e.id);
+        sessionApplied[e.id] = 1;
+        changed = true;
+        return;
+      }
+
+      sessionApplied[e.id] = 1;
+      seenMap[e.id] = 1;
+      seen.push(e.id);
+      changed = true;
+      try { applyEntry(e); } catch (err) {}
+    });
+
+    if (changed) saveSeen(seen);
+    bootstrapped = true;
+  }
+
+  function fetchCheatText() {
+    var rawUrl = 'https://raw.githubusercontent.com/' + CREATOR_GH_REPO + '/main/cheat.json?t=' + Date.now();
+    return fetch(rawUrl, { cache: 'no-cache', mode: 'cors' }).then(function (r) {
+      if (r.status === 404) return '';
+      if (!r.ok) throw new Error('raw ' + r.status);
+      return r.text();
+    }).catch(function () {
+      return fetch(GH_API + '/repos/' + CREATOR_GH_REPO + '/contents/cheat.json?ref=main', {
+        cache: 'no-cache',
+        mode: 'cors',
+        headers: { 'Accept': 'application/vnd.github.raw+json' }
+      }).then(function (r) {
+        if (r.status === 404) return '';
+        if (r.status === 403 || r.status === 429) throw new Error('rate');
+        if (!r.ok) throw new Error('http ' + r.status);
+        return r.text();
+      });
     });
   }
 
   function poll() {
     var delay = POLL_MS;
-    if (typeof document !== 'undefined' && document.hidden) return setTimeout(poll, POLL_MS);
-    // raw URL 우선 (API 레이트리밋·CORS에 덜 민감), 실패 시 API
-    var rawUrl = 'https://raw.githubusercontent.com/' + CREATOR_GH_REPO + '/main/cheat.json?t=' + Date.now();
-    fetch(rawUrl, { cache: 'no-cache' }).then(function (r) {
-      if (r.status === 404) return '';
-      if (!r.ok) throw new Error('raw ' + r.status);
-      return r.text();
-    }).catch(function () {
-      return fetch(GH_API + '/repos/' + CREATOR_GH_REPO + '/contents/cheat.json', {
-        cache: 'no-cache',
-        headers: { 'Accept': 'application/vnd.github.raw+json' }
-      }).then(function (r) {
-        if (r.status === 404) return '';
-        if (r.status === 403 || r.status === 429) { delay = BACKOFF_MS; throw new Error('rate'); }
-        if (!r.ok) throw new Error('http ' + r.status);
-        return r.text();
-      });
-    }).then(function (txt) {
+    fetchCheatText().then(function (txt) {
       var entries = [];
-      if (txt) { try { var d = JSON.parse(txt); if (d && Array.isArray(d.entries)) entries = d.entries; } catch (e) {} }
+      if (txt) {
+        try {
+          var d = JSON.parse(txt);
+          if (d && Array.isArray(d.entries)) entries = d.entries;
+        } catch (e) {}
+      }
       processEntries(entries);
-    }).catch(function () {}).then(function () { setTimeout(poll, delay); });
+      try {
+        window.__PRANA_CHEAT_LAST = {
+          at: Date.now(),
+          count: entries.length,
+          lastId: entries.length ? entries[entries.length - 1].id : null
+        };
+      } catch (e) {}
+    }).catch(function (err) {
+      if (err && String(err.message || err).indexOf('rate') >= 0) delay = BACKOFF_MS;
+    }).then(function () {
+      setTimeout(poll, delay);
+    });
   }
 
-  function connect() { poll(); }
+  // 테스트용: 수신 기록 초기화 후 즉시 다시 받음
+  window.PRANA_RESET_CHEAT_SEEN = function () {
+    try { localStorage.removeItem(SEEN_KEY); } catch (e) {}
+    sessionApplied = {};
+    bootstrapped = false;
+    toast('제작자 명령 수신 기록을 초기화했습니다. 다시 확인합니다…');
+    fetchCheatText().then(function (txt) {
+      var entries = [];
+      if (txt) {
+        try {
+          var d = JSON.parse(txt);
+          if (d && Array.isArray(d.entries)) entries = d.entries;
+        } catch (e) {}
+      }
+      processEntries(entries);
+    }).catch(function () {});
+  };
 
+  function connect() { setTimeout(poll, 1500); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', connect);
   else connect();
 })();
 </script>
+
 
 
 <script id="v104-ai-intelligence-groupchat-2">
