@@ -1901,6 +1901,7 @@ window.openV10Hub = function (tab) {
       <input type="file" id="playdata-file-input" accept="application/json,.json,text/plain" style="width:100%;margin-bottom:10px;font-size:13px;color:var(--text-color);">
       <button type="button" class="main-btn" onclick="importPlayDataFromFile()" style="margin-bottom:8px;background:#2563eb;">⬆️ 파일에서 불러오기</button>
       <button type="button" class="main-btn" onclick="restoreV101PreImportBackup()" style="margin-bottom:8px;background:#b45309;">↩️ 가져오기 직전 데이터 복구</button>
+      <button type="button" class="main-btn" onclick="runV101DataRecoveryTest()" style="margin-bottom:8px;background:#be123c;">🧪 데이터 제거 후 복구 테스트</button>
       <p style="font-size:11px;line-height:1.45;color:#8a9bb0;margin:0 0 10px;">복원 전에는 현재 데이터를 내부 임시 백업으로 보관합니다. 다른 기기로 옮길 때는 JSON 파일 내보내기도 함께 이용해 주세요.</p>
       <label style="font-size:12px;color:#8a9bb0;margin-bottom:4px;display:block;font-weight:bold;">또는 JSON 텍스트 붙여넣기</label>
       <textarea id="playdata-paste" rows="4" placeholder='{"version":1,...}' style="width:100%;padding:10px;background:var(--bg-color);border:1px solid var(--border-color);color:var(--text-color);border-radius:6px;margin-bottom:10px;font-size:12px;outline:none;"></textarea>
@@ -15371,6 +15372,30 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
       alert('임시 백업을 복구했습니다. 화면을 새로고침합니다.');
       location.reload();
     } catch (e) { setPlayMessage('임시 백업 복구 실패: ' + (e.message || e), true); }
+  };
+
+  // 현재 PRANA_ 데이터를 메모리에 백업한 뒤 제거하고 즉시 동일하게 복원합니다.
+  // PRANA_CREATOR_SEEN도 함께 복원하므로 기존 전 서버 보상이 중복 지급되지 않습니다.
+  window.runV101DataRecoveryTest = function () {
+    if (!confirm('현재 플레이 데이터를 안전하게 임시 보관한 뒤 제거하고 즉시 복구합니다.\n\n보상 수신 기록도 함께 복구되므로 기존 보상은 중복 지급되지 않습니다. 계속할까요?')) return;
+    try {
+      var backup = collectStoredPranaData();
+      var keys = Object.keys(backup);
+      if (!keys.length) throw new Error('복구할 PRANA_ 데이터가 없습니다.');
+
+      keys.forEach(function (key) { localStorage.removeItem(key); });
+      keys.forEach(function (key) { localStorage.setItem(key, String(backup[key] == null ? '' : backup[key])); });
+
+      var failed = keys.filter(function (key) {
+        return localStorage.getItem(key) !== String(backup[key] == null ? '' : backup[key]);
+      });
+      if (failed.length) throw new Error('복구되지 않은 항목: ' + failed.slice(0, 3).join(', '));
+      try { if (typeof window.refreshEconomyUI === 'function') window.refreshEconomyUI(); } catch (e1) {}
+      setPlayMessage('✅ 데이터 제거·복구 테스트 완료 (' + keys.length + '개 항목)\n재화와 전 서버 수신 기록을 그대로 보존했습니다.', false);
+      alert('데이터 제거 후 복구가 완료되었습니다.\n\n재화와 보상 수신 기록이 그대로 보존되었습니다.');
+    } catch (e) {
+      setPlayMessage('데이터 제거·복구 테스트 실패: ' + (e && e.message ? e.message : String(e)), true);
+    }
   };
 
   // Mobile layout: bigger tap targets, keyboard-safe modal and no horizontal overflow.
