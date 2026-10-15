@@ -17969,6 +17969,57 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
     return null;
   }
 
+  // GitHub의 cheat.json에 명령을 병합하고 커밋합니다.
+  // 기존 파일의 sha를 함께 보내야 GitHub Contents API의 PUT이 정상 처리됩니다.
+  function pushCheatEntry(entry) {
+    var tokenEl = document.getElementById('v106-gh-token');
+    var token = String((tokenEl && tokenEl.value) || sg(GH_TOKEN_KEY) || '').trim();
+    if (!token) return Promise.reject(new Error('GitHub 토큰이 없습니다.'));
+    ss(GH_TOKEN_KEY, token);
+
+    var api = 'https://api.github.com/repos/' + CREATOR_GH_REPO + '/contents/' + CHEAT_PATH;
+    var headers = authHeaders(token, false);
+    var current = { entries: [] };
+    var sha = null;
+
+    return fetch(api + '?ref=main&_=' + Date.now(), {
+      method: 'GET',
+      cache: 'no-store',
+      headers: headers
+    }).then(function (r) {
+      if (r.status === 404) return null;
+      return r.text().then(function (text) {
+        if (!r.ok) throw new Error(parseGhError(r, text));
+        var file;
+        try { file = JSON.parse(text || '{}'); } catch (e) { throw new Error('GitHub 파일 응답을 해석할 수 없습니다.'); }
+        sha = file.sha || null;
+        current = normalizeCheatData(decodeGhContent(file.content || ''));
+        return file;
+      });
+    }).then(function () {
+      var next = mergeEntry(current, entry);
+      var body = JSON.stringify(next, null, 2);
+      var payload = {
+        message: 'chore: publish creator command ' + entry.id,
+        content: b64utf8(body),
+        branch: 'main'
+      };
+      if (sha) payload.sha = sha;
+      return fetch(api, {
+        method: 'PUT',
+        cache: 'no-store',
+        headers: authHeaders(token, true),
+        body: JSON.stringify(payload)
+      }).then(function (r) {
+        return r.text().then(function (text) {
+          if (!r.ok) throw new Error(parseGhError(r, text));
+          window.__v106LastCheat = next;
+          return { pushed: true, data: next };
+        });
+      });
+    });
+  }
+
   window.v106ManualDeploy = function () {
     var entry = entryFromForm();
     if (!entry) {
