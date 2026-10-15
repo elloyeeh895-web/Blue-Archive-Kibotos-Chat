@@ -17585,7 +17585,33 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
   }
 
   function b64utf8(str) {
-    return btoa(unescape(encodeURIComponent(str)));
+    // UTF-8 safe base64 (mobile Safari 포함)
+    var s = String(str);
+    try {
+      if (typeof TextEncoder !== 'undefined') {
+        var bytes = new TextEncoder().encode(s);
+        var bin = '';
+        for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return btoa(bin);
+      }
+    } catch (e) {}
+    return btoa(unescape(encodeURIComponent(s)));
+  }
+
+  function parseGhError(r, bodyText) {
+    var msg = 'GitHub 쓰기 실패 (' + r.status + ')';
+    try {
+      var j = JSON.parse(bodyText || '');
+      if (j && j.message) msg += ': ' + j.message;
+      if (j && j.errors && j.errors.length) {
+        msg += ' — ' + j.errors.map(function (e) {
+          return (e.message || e.code || JSON.stringify(e));
+        }).join('; ');
+      }
+    } catch (e) {
+      if (bodyText) msg += ': ' + String(bodyText).slice(0, 180);
+    }
+    return msg;
   }
 
   function markSeen(entryId) {
@@ -17603,42 +17629,78 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
     token = String(token).trim();
     if (token) ss(GH_TOKEN_KEY, token);
     if (!token) return Promise.resolve({ pushed: false, reason: 'no_token' });
+
     var api = 'https://api.github.com/repos/' + CREATOR_GH_REPO + '/contents/' + CHEAT_PATH;
-    return fetch(api, {
-      headers: { 'Accept': 'application/vnd.github+json', 'Authorization': 'Bearer ' + token },
-      cache: 'no-cache'
-    }).then(function (r) {
-      if (r.status === 404) return { sha: null, data: { entries: [] } };
-      if (!r.ok) throw new Error('GitHub 읽기 실패 (' + r.status + ')');
-      return r.json().then(function (j) {
-        var raw = '';
-        try { raw = decodeURIComponent(escape(atob(j.content.replace(/\n/g, '')))); }
-        catch (e) { try { raw = atob(j.content.replace(/\n/g, '')); } catch (e2) { raw = ''; } }
-        var data = { entries: [] };
-        try { data = JSON.parse(raw) || data; } catch (e) {}
-        if (!Array.isArray(data.entries)) data.entries = [];
-        return { sha: j.sha, data: data };
+    var headersGet = {
+      'Accept': 'application/vnd.github+json',
+      'Authorization': 'Bearer ' + token,
+      'X-GitHub-Api-Version': '2022-11-28'
+    };
+    var headersPut = {
+      'Accept': 'application/vnd.github+json',
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json',
+      'X-GitHub-Api-Version': '2022-11-28'
+    };
+
+    function readPack() {
+      return fetch(api + '?ref=main', { headers: headersGet, cache: 'no-cache' }).then(function (r) {
+        if (r.status === 404) return { sha: null, data: { entries: [] } };
+        if (!r.ok) {
+          return r.text().then(function (t) {
+            throw new Error(parseGhError(r, t).replace('쓰기', '읽기'));
+          });
+        }
+        return r.json().then(function (j) {
+          var raw = '';
+          var b64 = (j.content || '').replace(/\n/g, '');
+          try {
+            var bin = atob(b64);
+            try { raw = decodeURIComponent(escape(bin)); }
+            catch (e1) { raw = bin; }
+          } catch (e2) { raw = ''; }
+          var data = { entries: [] };
+          try {
+            var parsed = JSON.parse(raw);
+            if (parsed && Array.isArray(parsed.entries)) data = parsed;
+            else if (Array.isArray(parsed)) data = { entries: parsed };
+          } catch (e) {}
+          if (!Array.isArray(data.entries)) data.entries = [];
+          return { sha: j.sha || null, data: data };
+        });
       });
-    }).then(function (pack) {
-      pack.data.entries.push(entry);
-      if (pack.data.entries.length > 80) pack.data.entries = pack.data.entries.slice(-80);
-      var body = JSON.stringify({
-        message: 'creator command ' + (entry.id || ''),
-        content: b64utf8(JSON.stringify(pack.data, null, 2)),
-        sha: pack.sha || undefined
-      });
+    }
+
+    function putPack(pack, attempt) {
+      var next = { entries: (pack.data.entries || []).slice() };
+      next.entries.push(entry);
+      if (next.entries.length > 80) next.entries = next.entries.slice(-80);
+      var payload = {
+        message: 'creator: ' + (entry.type || 'cmd') + ' ' + (entry.id || ''),
+        content: b64utf8(JSON.stringify(next)),
+        branch: 'main'
+      };
+      if (pack.sha) payload.sha = pack.sha;
       return fetch(api, {
         method: 'PUT',
-        headers: {
-          'Accept': 'application/vnd.github+json',
-          'Authorization': 'Bearer ' + token,
-          'Content-Type': 'application/json'
-        },
-        body: body
+        headers: headersPut,
+        body: JSON.stringify(payload)
       }).then(function (r) {
-        if (!r.ok) throw new Error('GitHub 쓰기 실패 (' + r.status + ')');
-        return { pushed: true };
+        if (r.ok) return { pushed: true };
+        return r.text().then(function (t) {
+          // SHA 충돌/검증 실패 시 한 번 재시도
+          if ((r.status === 409 || r.status === 422) && attempt < 2) {
+            return readPack().then(function (fresh) {
+              return putPack(fresh, attempt + 1);
+            });
+          }
+          throw new Error(parseGhError(r, t));
+        });
       });
+    }
+
+    return readPack().then(function (pack) {
+      return putPack(pack, 0);
     });
   }
 
