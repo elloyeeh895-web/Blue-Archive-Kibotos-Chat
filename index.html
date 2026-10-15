@@ -17806,93 +17806,97 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
 
   function downloadCheatFile(obj) {
     var body = JSON.stringify(obj, null, 2);
-    var blob = new Blob([body], { type: 'application/json;charset=utf-8' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'cheat.json';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function () {
-      try { URL.revokeObjectURL(a.href); } catch (e) {}
-      a.remove();
-    }, 2000);
+    try {
+      var blob = new Blob([body], { type: 'application/json;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'cheat.json';
+      a.rel = 'noopener';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () {
+        try { URL.revokeObjectURL(a.href); } catch (e) {}
+        try { a.remove(); } catch (e2) {}
+      }, 2500);
+    } catch (e) {}
     return body;
   }
 
   function openGhEdit() {
     var url = 'https://github.com/' + CREATOR_GH_REPO + '/edit/main/' + CHEAT_PATH;
-    try { window.open(url, '_blank', 'noopener'); } catch (e) {
-      try { location.href = url; } catch (e2) {}
-    }
+    var opened = null;
+    try { opened = window.open(url, '_blank'); } catch (e) { opened = null; }
+    return { url: url, opened: !!opened };
   }
 
-  /** 토큰으로 API 쓰기 시도 */
-  function pushCheatEntry(entry) {
-    var tokenEl = document.getElementById('v106-gh-token');
-    var token = (tokenEl && tokenEl.value) || sg(GH_TOKEN_KEY) || '';
-    token = String(token).trim();
-    if (token) ss(GH_TOKEN_KEY, token);
-    if (!token) return Promise.resolve({ pushed: false, reason: 'no_token' });
-
-    var api = 'https://api.github.com/repos/' + CREATOR_GH_REPO + '/contents/' + CHEAT_PATH;
-
-    function readPack() {
-      return fetch(api + '?ref=main', {
-        headers: authHeaders(token, false),
-        cache: 'no-cache'
-      }).then(function (r) {
-        if (r.status === 404) return { sha: null, data: { entries: [] } };
-        if (!r.ok) {
-          return r.text().then(function (t) {
-            throw new Error('읽기 실패: ' + parseGhError(r, t));
-          });
+  function showDeployPanel(body, entry) {
+    var existing = document.getElementById('v106-deploy-panel');
+    if (existing) existing.remove();
+    var wrap = document.createElement('div');
+    wrap.id = 'v106-deploy-panel';
+    wrap.style.cssText = 'margin-top:12px;padding:12px;border:1px solid var(--border-color);border-radius:10px;background:var(--bg-color);text-align:left';
+    var ghUrl = 'https://github.com/' + CREATOR_GH_REPO + '/edit/main/' + CHEAT_PATH;
+    wrap.innerHTML =
+      '<div style="font-weight:800;margin-bottom:8px;color:#a78bfa">📦 수동 배포 준비됨</div>' +
+      '<div style="font-size:12px;line-height:1.55;color:#cbd5e1;margin-bottom:8px">' +
+      '① 아래 <b>복사</b> 버튼 누르기<br>' +
+      '② <b>GitHub 열기</b> 후 로그인<br>' +
+      '③ 편집창 내용 전부 지우고 붙여넣기<br>' +
+      '④ Commit changes</div>' +
+      '<textarea id="v106-deploy-text" readonly style="width:100%;height:120px;font-size:11px;line-height:1.4;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:#0b0e14;color:#e2e8f0;resize:vertical"></textarea>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">' +
+      '<button type="button" class="main-btn" style="flex:1;min-width:120px;margin:0;background:#0f766e" id="v106-copy-json">📋 JSON 복사</button>' +
+      '<a class="main-btn" style="flex:1;min-width:120px;margin:0;background:#7c3aed;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center" href="' + ghUrl + '" target="_blank" rel="noopener">GitHub 열기</a>' +
+      '</div>' +
+      '<div style="font-size:11px;color:#94a3b8;margin-top:8px;word-break:break-all">링크: ' + ghUrl + '</div>';
+    var msg = document.getElementById('v106-cmd-msg');
+    if (msg && msg.parentNode) msg.parentNode.insertBefore(wrap, msg);
+    else {
+      var modal = document.querySelector('#v106-cmd-modal .modal-content');
+      if (modal) modal.appendChild(wrap);
+    }
+    var ta = document.getElementById('v106-deploy-text');
+    if (ta) ta.value = body;
+    var copyBtn = document.getElementById('v106-copy-json');
+    if (copyBtn) {
+      copyBtn.onclick = function () {
+        var val = (ta && ta.value) || body;
+        function ok() {
+          copyBtn.textContent = '✅ 복사됨';
+          setMsg('v106-cmd-msg', 'JSON 복사 완료. GitHub 열기 → 붙여넣기 → Commit changes', true);
+          setTimeout(function () { copyBtn.textContent = '📋 JSON 복사'; }, 2000);
         }
-        return r.json().then(function (j) {
-          return { sha: j.sha || null, data: normalizeCheatData(decodeGhContent(j.content)) };
-        });
-      });
-    }
-
-    function doPut(sha, dataObj, attempt) {
-      var next = mergeEntry(dataObj, entry);
-      var payload = {
-        message: 'chore: creator ' + String(entry.type || 'cmd') + ' ' + String(entry.id || ''),
-        content: b64utf8(JSON.stringify(next)),
-        branch: 'main'
-      };
-      if (sha) payload.sha = sha;
-      return fetch(api, {
-        method: 'PUT',
-        headers: authHeaders(token, true),
-        body: JSON.stringify(payload)
-      }).then(function (r) {
-        if (r.ok || r.status === 201) return { pushed: true };
-        return r.text().then(function (t) {
-          if ((r.status === 409 || r.status === 422) && attempt < 3) {
-            return readPack().then(function (fresh) {
-              return doPut(fresh.sha, fresh.data, attempt + 1);
-            });
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(val).then(ok).catch(function () {
+            if (ta) { ta.focus(); ta.select(); try { document.execCommand('copy'); ok(); } catch (e) {
+              setMsg('v106-cmd-msg', '복사 실패. 위 텍스트를 길게 눌러 복사하세요.', false);
+            } }
+          });
+        } else if (ta) {
+          ta.focus(); ta.select();
+          try { document.execCommand('copy'); ok(); } catch (e) {
+            setMsg('v106-cmd-msg', '위 텍스트를 길게 눌러 전체 복사하세요.', false);
           }
-          throw new Error(parseGhError(r, t));
-        });
-      });
+        }
+      };
     }
-
-    return readPack().then(function (pack) {
-      return doPut(pack.sha, pack.data, 0);
-    });
   }
 
-  /** 토큰 실패/없을 때: 파일 다운로드 + GitHub 편집 페이지 (저장소 주인이면 브라우저 로그인만으로 배포 가능) */
   function deployManual(entry) {
-    return fetchCheatPublic().then(function (data) {
+    // 서버 읽기 실패해도 로컬 항목만이라도 배포 가능하게
+    return fetchCheatPublic().catch(function () {
+      return { entries: [] };
+    }).then(function (data) {
+      if (!data || !Array.isArray(data.entries)) data = { entries: [] };
       var next = mergeEntry(data, entry);
       window.__v106LastCheat = next;
       window.__v106LastEntry = entry;
-      downloadCheatFile(next);
-      openGhEdit();
-      return next;
+      var body = JSON.stringify(next, null, 2);
+      try { downloadCheatFile(next); } catch (e) {}
+      var gh = openGhEdit();
+      showDeployPanel(body, entry);
+      return { next: next, body: body, gh: gh };
     });
   }
 
@@ -17928,9 +17932,7 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
   };
 
   function entryFromForm() {
-    // 1) 직전 실행 기록
     if (window.__v106LastEntry && window.__v106LastEntry.id) return window.__v106LastEntry;
-    // 2) 공지 탭 입력
     var notice = document.getElementById('v106-notice');
     if (notice && notice.value && notice.value.trim()) {
       return {
@@ -17940,7 +17942,6 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
         ts: Date.now()
       };
     }
-    // 3) 재화 지급 탭
     var cur = document.getElementById('v106-currency');
     var amt = document.getElementById('v106-amount');
     if (cur && amt) {
@@ -17955,7 +17956,6 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
         };
       }
     }
-    // 4) 직접 입력 탭
     var raw = document.getElementById('v106-cmd-input');
     if (raw && raw.value && raw.value.trim()) {
       var parsed = parseCommand(raw.value.trim());
@@ -17972,31 +17972,29 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
   window.v106ManualDeploy = function () {
     var entry = entryFromForm();
     if (!entry) {
-      setMsg('v106-cmd-msg', '공지 내용을 입력하거나, 재화 수량을 넣은 뒤 「수동 배포」를 누르세요.', false);
+      setMsg('v106-cmd-msg', '공지 칸에 글을 입력하거나, 재화 수량을 넣은 다음 「수동 배포」를 누르세요.', false);
       return;
     }
     window.__v106LastEntry = entry;
-    // 로컬에도 한 번 적용 (아직 안 했을 수 있음)
     try {
       if (entry.type === 'notice') showBanner(entry.text);
       else if (entry.type === 'grant') applyLocalGrant(entry.currency, entry.amount);
       markSeen(entry.id);
     } catch (e) {}
-    setMsg('v106-cmd-msg', 'cheat.json 준비 중…', true);
-    deployManual(entry).then(function () {
+    setMsg('v106-cmd-msg', '배포 파일 준비 중…', true);
+    deployManual(entry).then(function (res) {
       setMsg('v106-cmd-msg',
-        '✅ 1) cheat.json 다운로드됨\n' +
-        '✅ 2) GitHub 편집 페이지 열림\n\n' +
-        '【Commit 방법】\n' +
-        '① 다운로드 폴더의 cheat.json 을 열어 전체 복사\n' +
-        '② GitHub 편집 화면의 글을 전부 지우고 붙여넣기\n' +
-        '③ 아래쪽 Commit changes 누르기\n' +
-        '④ 확인 창에서 다시 Commit changes\n\n' +
-        '그 다음 「서버 확인」으로 성공 여부를 보세요.',
+        '✅ 준비 완료\n아래 「JSON 복사」→「GitHub 열기」→ 붙여넣기 → Commit changes',
         true);
     }).catch(function (err) {
-      setMsg('v106-cmd-msg', '수동 배포 준비 실패: ' + (err && err.message ? err.message : err) +
-        '\n네트워크를 확인한 뒤 다시 눌러보세요.', false);
+      // 최후: 항목 하나만이라도 보여 주기
+      var alone = { entries: [entry] };
+      var body = JSON.stringify(alone, null, 2);
+      window.__v106LastCheat = alone;
+      showDeployPanel(body, entry);
+      setMsg('v106-cmd-msg',
+        '서버 목록 병합은 실패했지만, 이번 명령 JSON은 준비됐습니다.\n복사 후 GitHub에 붙여넣으세요.\n(' + (err && err.message ? err.message : err) + ')',
+        true);
     });
   };
 
