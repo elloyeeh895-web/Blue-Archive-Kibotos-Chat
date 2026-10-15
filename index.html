@@ -17927,23 +17927,76 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
     });
   };
 
+  function entryFromForm() {
+    // 1) 직전 실행 기록
+    if (window.__v106LastEntry && window.__v106LastEntry.id) return window.__v106LastEntry;
+    // 2) 공지 탭 입력
+    var notice = document.getElementById('v106-notice');
+    if (notice && notice.value && notice.value.trim()) {
+      return {
+        id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6),
+        type: 'notice',
+        text: notice.value.trim().slice(0, 200),
+        ts: Date.now()
+      };
+    }
+    // 3) 재화 지급 탭
+    var cur = document.getElementById('v106-currency');
+    var amt = document.getElementById('v106-amount');
+    if (cur && amt) {
+      var n = Math.floor(Number(amt.value));
+      if (isFinite(n) && n > 0) {
+        return {
+          id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6),
+          type: 'grant',
+          currency: cur.value,
+          amount: n,
+          ts: Date.now()
+        };
+      }
+    }
+    // 4) 직접 입력 탭
+    var raw = document.getElementById('v106-cmd-input');
+    if (raw && raw.value && raw.value.trim()) {
+      var parsed = parseCommand(raw.value.trim());
+      if (!parsed.error) {
+        if (parsed.type === 'notice') {
+          return { id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6), type: 'notice', text: parsed.text, ts: Date.now() };
+        }
+        return { id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6), type: 'grant', currency: parsed.currency, amount: parsed.amount, ts: Date.now() };
+      }
+    }
+    return null;
+  }
+
   window.v106ManualDeploy = function () {
-    var entry = window.__v106LastEntry;
+    var entry = entryFromForm();
     if (!entry) {
-      setMsg('v106-cmd-msg', '먼저 공지 또는 재화 지급을 한 번 실행하세요.', false);
+      setMsg('v106-cmd-msg', '공지 내용을 입력하거나, 재화 수량을 넣은 뒤 「수동 배포」를 누르세요.', false);
       return;
     }
+    window.__v106LastEntry = entry;
+    // 로컬에도 한 번 적용 (아직 안 했을 수 있음)
+    try {
+      if (entry.type === 'notice') showBanner(entry.text);
+      else if (entry.type === 'grant') applyLocalGrant(entry.currency, entry.amount);
+      markSeen(entry.id);
+    } catch (e) {}
     setMsg('v106-cmd-msg', 'cheat.json 준비 중…', true);
     deployManual(entry).then(function () {
       setMsg('v106-cmd-msg',
-        '✅ cheat.json 다운로드 완료 + GitHub 편집 페이지를 열었습니다.\n\n' +
-        '① 다운로드한 cheat.json 을 메모장으로 열어 전체 복사\n' +
-        '② GitHub 편집 화면에서 기존 내용을 모두 지우고 붙여넣기\n' +
-        '③ Commit changes\n\n' +
-        '약 20초 후 다른 플레이어에게 반영됩니다.',
+        '✅ 1) cheat.json 다운로드됨\n' +
+        '✅ 2) GitHub 편집 페이지 열림\n\n' +
+        '【Commit 방법】\n' +
+        '① 다운로드 폴더의 cheat.json 을 열어 전체 복사\n' +
+        '② GitHub 편집 화면의 글을 전부 지우고 붙여넣기\n' +
+        '③ 아래쪽 Commit changes 누르기\n' +
+        '④ 확인 창에서 다시 Commit changes\n\n' +
+        '그 다음 「서버 확인」으로 성공 여부를 보세요.',
         true);
     }).catch(function (err) {
-      setMsg('v106-cmd-msg', '수동 배포 준비 실패: ' + (err && err.message ? err.message : err), false);
+      setMsg('v106-cmd-msg', '수동 배포 준비 실패: ' + (err && err.message ? err.message : err) +
+        '\n네트워크를 확인한 뒤 다시 눌러보세요.', false);
     });
   };
 
@@ -18179,9 +18232,16 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
       setMsg('v106-cmd-msg', '공지 내용을 입력해 주세요.', false);
       return;
     }
+    var entry = {
+      id: 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6),
+      type: 'notice',
+      text: text,
+      ts: Date.now()
+    };
+    window.__v106LastEntry = entry;
     showBanner(text);
-    var entryId = 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
-    finishGrant({ id: entryId, type: 'notice', text: text, ts: Date.now() }, '공지 표시 완료');
+    setMsg('v106-cmd-msg', '공지 표시 완료. 전 서버 배포를 준비합니다…', true);
+    finishGrant(entry, '공지 표시 완료');
   };
 
   window.v106RunCommand = function () {
