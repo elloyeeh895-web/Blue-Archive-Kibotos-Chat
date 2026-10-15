@@ -17568,8 +17568,13 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
       '<input type="text" id="v106-cmd-input" placeholder="《all.청휘석:1000》" onkeydown="if(event.key===\'Enter\')window.v106RunCommand()">' +
       '<button type="button" class="main-btn" style="margin-top:8px" onclick="window.v106RunCommand()">실행</button>' +
       '</div>' +
-      '<label for="v106-gh-token" style="margin-top:12px">GitHub 토큰 (전 서버 배포용, 선택)</label>' +
-      '<input type="password" id="v106-gh-token" placeholder="repo 권한 PAT (이 기기에만 저장)" autocomplete="off">' +
+      '<label for="v106-gh-token" style="margin-top:12px">GitHub 토큰 (전 서버 배포용)</label>' +
+      '<input type="password" id="v106-gh-token" placeholder="repo / Contents:write PAT (이 기기에만 저장)" autocomplete="off">' +
+      '<div class="v106-row" style="margin-top:8px">' +
+      '<button type="button" class="main-btn" style="background:#0f766e;margin:0" onclick="window.v106TestToken()">토큰 권한 확인</button>' +
+      '<button type="button" class="main-btn" style="background:#7c3aed;margin:0" onclick="window.v106CopyManual(window.__v106LastEntry||{id:\'manual\',type:\'notice\',text:\'(항목 없음)\',ts:Date.now()})">수동 배포 복사</button>' +
+      '</div>' +
+      '<p class="v106-hint" style="text-align:left;margin-top:8px">422가 나면 보통 토큰에 <b>Contents 쓰기</b> 권한이 없는 경우입니다. Classic PAT은 <code>repo</code>, Fine-grained는 해당 저장소 <code>Contents: Read and write</code>가 필요합니다.</p>' +
       '<p class="v106-status" id="v106-cmd-msg"></p>' +
       '<button type="button" class="main-btn" style="background:#334155" onclick="window.v106CloseCmd()">닫기</button>' +
       '</div>';
@@ -17585,13 +17590,15 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
   }
 
   function b64utf8(str) {
-    // UTF-8 safe base64 (mobile Safari 포함)
     var s = String(str);
     try {
       if (typeof TextEncoder !== 'undefined') {
         var bytes = new TextEncoder().encode(s);
         var bin = '';
-        for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        var chunk = 0x8000;
+        for (var i = 0; i < bytes.length; i += chunk) {
+          bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+        }
         return btoa(bin);
       }
     } catch (e) {}
@@ -17599,121 +17606,200 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
   }
 
   function parseGhError(r, bodyText) {
-    var msg = 'GitHub 쓰기 실패 (' + r.status + ')';
+    var msg = 'HTTP ' + r.status;
     try {
       var j = JSON.parse(bodyText || '');
-      if (j && j.message) msg += ': ' + j.message;
-      if (j && j.errors && j.errors.length) {
-        msg += ' — ' + j.errors.map(function (e) {
-          return (e.message || e.code || JSON.stringify(e));
-        }).join('; ');
+      if (j && j.message) msg += ' · ' + j.message;
+      if (j && Array.isArray(j.errors) && j.errors.length) {
+        msg += ' · ' + j.errors.map(function (e) {
+          if (typeof e === 'string') return e;
+          return (e.field ? e.field + ': ' : '') + (e.message || e.code || JSON.stringify(e));
+        }).join(' / ');
       }
+      if (j && j.documentation_url) msg += '\n' + j.documentation_url;
     } catch (e) {
-      if (bodyText) msg += ': ' + String(bodyText).slice(0, 180);
+      if (bodyText) msg += ' · ' + String(bodyText).replace(/\s+/g, ' ').slice(0, 220);
     }
     return msg;
   }
 
-  function markSeen(entryId) {
+  function authHeaders(token, withJson) {
+    var h = {
+      'Accept': 'application/vnd.github+json',
+      'Authorization': 'Bearer ' + token,
+      'X-GitHub-Api-Version': '2022-11-28'
+    };
+    if (withJson) h['Content-Type'] = 'application/json';
+    return h;
+  }
+
+  function decodeGhContent(b64) {
+    var raw = '';
+    var clean = String(b64 || '').replace(/\s/g, '');
     try {
-      var seen = [];
-      try { seen = JSON.parse(sg('PRANA_CREATOR_SEEN') || '[]'); } catch (e) { seen = []; }
-      if (!Array.isArray(seen)) seen = [];
-      seen.push(entryId);
-      ss('PRANA_CREATOR_SEEN', JSON.stringify(seen.slice(-50)));
+      var bin = atob(clean);
+      try { raw = decodeURIComponent(escape(bin)); } catch (e1) { raw = bin; }
+    } catch (e2) { raw = ''; }
+    return raw;
+  }
+
+  function normalizeCheatData(raw) {
+    var data = { entries: [] };
+    try {
+      var parsed = JSON.parse(raw || '{}');
+      if (parsed && Array.isArray(parsed.entries)) data.entries = parsed.entries;
+      else if (Array.isArray(parsed)) data.entries = parsed;
     } catch (e) {}
+    if (!Array.isArray(data.entries)) data.entries = [];
+    return data;
   }
 
   function pushCheatEntry(entry) {
-    var token = (document.getElementById('v106-gh-token') && document.getElementById('v106-gh-token').value) || sg(GH_TOKEN_KEY) || '';
+    var tokenEl = document.getElementById('v106-gh-token');
+    var token = (tokenEl && tokenEl.value) || sg(GH_TOKEN_KEY) || '';
     token = String(token).trim();
     if (token) ss(GH_TOKEN_KEY, token);
     if (!token) return Promise.resolve({ pushed: false, reason: 'no_token' });
 
     var api = 'https://api.github.com/repos/' + CREATOR_GH_REPO + '/contents/' + CHEAT_PATH;
-    var headersGet = {
-      'Accept': 'application/vnd.github+json',
-      'Authorization': 'Bearer ' + token,
-      'X-GitHub-Api-Version': '2022-11-28'
-    };
-    var headersPut = {
-      'Accept': 'application/vnd.github+json',
-      'Authorization': 'Bearer ' + token,
-      'Content-Type': 'application/json',
-      'X-GitHub-Api-Version': '2022-11-28'
-    };
 
     function readPack() {
-      return fetch(api + '?ref=main', { headers: headersGet, cache: 'no-cache' }).then(function (r) {
+      return fetch(api + '?ref=main', {
+        headers: authHeaders(token, false),
+        cache: 'no-cache'
+      }).then(function (r) {
         if (r.status === 404) return { sha: null, data: { entries: [] } };
         if (!r.ok) {
           return r.text().then(function (t) {
-            throw new Error(parseGhError(r, t).replace('쓰기', '읽기'));
+            throw new Error('읽기 실패: ' + parseGhError(r, t));
           });
         }
         return r.json().then(function (j) {
-          var raw = '';
-          var b64 = (j.content || '').replace(/\n/g, '');
-          try {
-            var bin = atob(b64);
-            try { raw = decodeURIComponent(escape(bin)); }
-            catch (e1) { raw = bin; }
-          } catch (e2) { raw = ''; }
-          var data = { entries: [] };
-          try {
-            var parsed = JSON.parse(raw);
-            if (parsed && Array.isArray(parsed.entries)) data = parsed;
-            else if (Array.isArray(parsed)) data = { entries: parsed };
-          } catch (e) {}
-          if (!Array.isArray(data.entries)) data.entries = [];
-          return { sha: j.sha || null, data: data };
+          return {
+            sha: j.sha || null,
+            data: normalizeCheatData(decodeGhContent(j.content))
+          };
         });
       });
     }
 
-    function putPack(pack, attempt) {
-      var next = { entries: (pack.data.entries || []).slice() };
+    function doPut(sha, dataObj, attempt) {
+      var next = { entries: (dataObj.entries || []).slice() };
+      // 동일 id 중복 방지
+      next.entries = next.entries.filter(function (e) { return !e || e.id !== entry.id; });
       next.entries.push(entry);
       if (next.entries.length > 80) next.entries = next.entries.slice(-80);
+
+      var contentStr = JSON.stringify(next);
       var payload = {
-        message: 'creator: ' + (entry.type || 'cmd') + ' ' + (entry.id || ''),
-        content: b64utf8(JSON.stringify(next)),
+        message: 'chore: creator ' + String(entry.type || 'cmd') + ' ' + String(entry.id || ''),
+        content: b64utf8(contentStr),
         branch: 'main'
       };
-      if (pack.sha) payload.sha = pack.sha;
+      if (sha) payload.sha = sha;
+
       return fetch(api, {
         method: 'PUT',
-        headers: headersPut,
+        headers: authHeaders(token, true),
         body: JSON.stringify(payload)
       }).then(function (r) {
-        if (r.ok) return { pushed: true };
+        if (r.ok || r.status === 201) return r.json().then(function () { return { pushed: true }; });
         return r.text().then(function (t) {
-          // SHA 충돌/검증 실패 시 한 번 재시도
-          if ((r.status === 409 || r.status === 422) && attempt < 2) {
+          var detail = parseGhError(r, t);
+          // 충돌/검증 실패 → 최신 sha로 재시도
+          if ((r.status === 409 || r.status === 422) && attempt < 3) {
             return readPack().then(function (fresh) {
-              return putPack(fresh, attempt + 1);
+              return doPut(fresh.sha, fresh.data, attempt + 1);
             });
           }
-          throw new Error(parseGhError(r, t));
+          // 권한 힌트
+          if (r.status === 401 || r.status === 403) {
+            throw new Error(detail + '\n→ 토큰에 저장소 Contents 쓰기 권한이 있는지 확인하세요.');
+          }
+          throw new Error(detail);
         });
       });
     }
 
     return readPack().then(function (pack) {
-      return putPack(pack, 0);
+      return doPut(pack.sha, pack.data, 0);
     });
+  }
+
+  window.v106TestToken = function () {
+    var tokenEl = document.getElementById('v106-gh-token');
+    var token = (tokenEl && tokenEl.value) || sg(GH_TOKEN_KEY) || '';
+    token = String(token).trim();
+    if (!token) {
+      setMsg('v106-cmd-msg', '토큰을 먼저 입력하세요.', false);
+      return;
+    }
+    ss(GH_TOKEN_KEY, token);
+    setMsg('v106-cmd-msg', '토큰·저장소 권한 확인 중…', true);
+    var repoApi = 'https://api.github.com/repos/' + CREATOR_GH_REPO;
+    fetch(repoApi, {
+      headers: authHeaders(token, false),
+      cache: 'no-cache'
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        if (!r.ok) throw new Error(parseGhError(r, t));
+        var j = JSON.parse(t);
+        var perms = j.permissions || {};
+        var lines = [];
+        lines.push('저장소: ' + (j.full_name || CREATOR_GH_REPO));
+        lines.push('기본 브랜치: ' + (j.default_branch || '?'));
+        lines.push('push 권한: ' + (perms.push === true ? '있음 ✅' : '없음 또는 확인 불가 ⚠️'));
+        lines.push('admin 권한: ' + (perms.admin === true ? '있음' : '없음'));
+        if (perms.push !== true) {
+          lines.push('');
+          lines.push('※ push가 없으면 쓰기가 거부됩니다.');
+          lines.push('Classic PAT: repo 스코프 필요');
+          lines.push('Fine-grained: Contents Read and write');
+        }
+        setMsg('v106-cmd-msg', lines.join('\n'), perms.push === true);
+        return perms;
+      });
+    }).catch(function (err) {
+      setMsg('v106-cmd-msg', '토큰 확인 실패: ' + (err && err.message ? err.message : err), false);
+    });
+  };
+
+  window.v106CopyManual = function (entry) {
+    var payload = { entries: [entry] };
+    var text = JSON.stringify(payload, null, 2);
+    function done(ok) {
+      setMsg('v106-cmd-msg',
+        (ok ? '📋 항목을 복사했습니다.\n' : '') +
+        'GitHub에서 cheat.json 을 연 뒤 entries 배열 끝에 붙여넣으세요.\n' +
+        '파일: https://github.com/' + CREATOR_GH_REPO + '/edit/main/cheat.json\n' +
+        '예시 항목:\n' + JSON.stringify(entry),
+        true);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(JSON.stringify(entry)).then(function () { done(true); }).catch(function () { done(false); });
+    } else {
+      done(false);
+    }
   }
 
   function finishGrant(entry, localLabel) {
     markSeen(entry.id);
     setMsg('v106-cmd-msg', localLabel + '\n전 서버 배포 중…', true);
+    window.__v106LastEntry = entry;
     pushCheatEntry(entry).then(function (res) {
-      if (res && res.pushed) setMsg('v106-cmd-msg', localLabel + '\n✅ 전 서버(cheat.json) 배포 완료', true);
-      else setMsg('v106-cmd-msg', localLabel + '\n✅ 로컬 적용 완료 (토큰 없음 → 전 서버 배포 생략)', true);
+      if (res && res.pushed) {
+        setMsg('v106-cmd-msg', localLabel + '\n✅ 전 서버(cheat.json) 배포 완료', true);
+      } else {
+        setMsg('v106-cmd-msg', localLabel + '\n✅ 로컬 적용 완료 (토큰 없음 → 전 서버 배포 생략)\n아래 「토큰 권한 확인」 또는 수동 배포를 사용하세요.', true);
+      }
       window.v106RefreshBal();
       window.v106RefreshBalSet();
     }).catch(function (err) {
-      setMsg('v106-cmd-msg', localLabel + '\n전 서버 배포 실패: ' + (err && err.message ? err.message : '오류'), false);
+      var detail = (err && err.message) ? err.message : String(err);
+      setMsg('v106-cmd-msg',
+        localLabel + '\n전 서버 배포 실패:\n' + detail +
+        '\n\n→ 「토큰 권한 확인」을 눌러 보거나, 「수동 배포 복사」로 cheat.json에 직접 붙여넣으세요.',
+        false);
       window.v106RefreshBal();
       window.v106RefreshBalSet();
     });
