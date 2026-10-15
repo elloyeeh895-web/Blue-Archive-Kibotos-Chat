@@ -7467,9 +7467,31 @@ ${bondNote}
     'Eligma': { type: 'eligma', amount: 300, once: true },
     'hello': { type: 'credits', amount: 500, once: true },
     'Chat Archive': { type: 'multi', pyroxene: 3000, credits: 2500, eligma: 500, once: true },
-    'vision': { type: 'unlock_room', room: 'mono_spin', once: true }
+    'vision': { type: 'unlock_room', room: 'mono_spin', once: true },
+    // v10.4 비밀 코드 추가
+    'God of Code': { type: 'multi', pyroxene: 10000, credits: 10000, streakProtect: 100, eligma: 5000, once: true },
+    // 일회성 비밀 코드의 재사용 제한을 영구적으로 해제합니다.
+    'Code infinity': { type: 'infinite_codes', once: true },
+    'sorry': { type: 'pyroxene', amount: 9999, once: true }
   };
   const SECRET_REDEEMED_KEY = 'PRANA_SECRET_REDEEMED';
+  // 「Code infinity」 적용 여부. 적용 후 기존 일회성 코드도 반복 사용할 수 있습니다.
+  const SECRET_INFINITY_KEY = 'PRANA_SECRET_INFINITY_ENABLED';
+
+  function isSecretInfinityEnabled() {
+    try {
+      const value = (typeof safeGet === 'function')
+        ? safeGet(SECRET_INFINITY_KEY)
+        : localStorage.getItem(SECRET_INFINITY_KEY);
+      return value === '1' || value === 'true';
+    } catch (e) { return false; }
+  }
+  function enableSecretInfinity() {
+    try {
+      if (typeof safeSet === 'function') safeSet(SECRET_INFINITY_KEY, '1');
+      else localStorage.setItem(SECRET_INFINITY_KEY, '1');
+    } catch (e) {}
+  }
 
   function loadRedeemedSecrets() {
     try {
@@ -7521,14 +7543,15 @@ ${bondNote}
       return;
     }
 
-    if (reward.once) {
+    const infinityEnabled = isSecretInfinityEnabled();
+    if (reward.once && !infinityEnabled) {
       const redeemed = loadRedeemedSecrets();
       if (redeemed[val]) {
         if (msg) {
           msg.style.color = '#f87171';
-          msg.textContent = '이미 사용한 비밀 코드입니다.';
+          msg.textContent = '이미 사용한 비밀 코드입니다. 「Code infinity」로 재사용 제한을 해제할 수 있습니다.';
         }
-        alert('이미 사용한 비밀 코드입니다.');
+        alert('이미 사용한 비밀 코드입니다.\n「Code infinity」를 입력하면 일회성 코드도 다시 사용할 수 있습니다.');
         return;
       }
     }
@@ -7611,6 +7634,7 @@ ${bondNote}
     } else if (reward.type === 'multi') {
       const pAmt = Math.max(0, Math.floor(reward.pyroxene || 0));
       const cAmt = Math.max(0, Math.floor(reward.credits || 0));
+      const sAmt = Math.max(0, Math.floor(reward.streakProtect || 0));
       const eAmt = Math.max(0, Math.floor(reward.eligma || 0));
       const parts = [];
       if (pAmt > 0) {
@@ -7635,6 +7659,15 @@ ${bondNote}
         } catch (e) {}
         parts.push('크레딧 +' + cAmt);
       }
+      if (sAmt > 0) {
+        try {
+          var sk = 'PRANA_V94_STREAK_PROTECT';
+          var curS = Math.max(0, Math.floor(Number((typeof safeGet === 'function' ? safeGet(sk) : localStorage.getItem(sk)) || 0) || 0));
+          if (typeof safeSet === 'function') safeSet(sk, String(curS + sAmt)); else localStorage.setItem(sk, String(curS + sAmt));
+        } catch (e) {}
+        parts.push('연속 지키기권 +' + sAmt);
+        try { if (typeof window.refreshStreakProtectUI === 'function') window.refreshStreakProtectUI(); } catch (e) {}
+      }
       if (eAmt > 0) {
         try {
           if (typeof window.addEligma === 'function') window.addEligma(eAmt);
@@ -7650,9 +7683,21 @@ ${bondNote}
         msg.style.color = '#22c55e';
         msg.textContent = '🎁 ' + parts.join(' · ');
       }
-      alert('비밀 코드 적용 성공!\n' + parts.join('\n'));
+      alert('비밀 코드 「' + val + '」 적용 성공!\n' + parts.join('\n'));
       try { if (typeof updateEligmaUI === 'function') updateEligmaUI(); } catch (e) {}
       try { if (typeof refreshEconomyUI === 'function') refreshEconomyUI(); } catch (e) {}
+    } else if (reward.type === 'infinite_codes') {
+      const alreadyEnabled = isSecretInfinityEnabled();
+      enableSecretInfinity();
+      if (msg) {
+        msg.style.color = '#22c55e';
+        msg.textContent = alreadyEnabled
+          ? '♾️ 비밀 코드 무제한 사용 시스템이 이미 활성화되어 있습니다.'
+          : '♾️ 비밀 코드 무제한 사용 시스템이 활성화되었습니다!';
+      }
+      alert(alreadyEnabled
+        ? '비밀 코드 무제한 사용 시스템이 이미 활성화되어 있습니다.\n기존 일회성 코드도 계속 사용할 수 있습니다.'
+        : '비밀 코드 적용 성공!\n♾️ 비밀 코드 무제한 사용 시스템이 활성화되었습니다.\n이제 이미 사용한 일회성 코드도 계속 사용할 수 있습니다.');
     } else if (reward.type === 'unlock_room') {
       const roomId = reward.room || 'bgm_pulse';
       let unlocked = false;
@@ -7761,7 +7806,7 @@ ${bondNote}
       return;
     }
 
-    if (reward.once) {
+    if (reward.once && !isSecretInfinityEnabled()) {
       const redeemed = loadRedeemedSecrets();
       redeemed[val] = Date.now();
       saveRedeemedSecrets(redeemed);
