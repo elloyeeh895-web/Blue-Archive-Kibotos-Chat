@@ -16883,6 +16883,25 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
   function injectMenu() {
     var list = document.querySelector('#main-menu-modal .menu-list');
     if (!list) return;
+    // 모든 기기: 수신 기록 초기화 (다른 기기 테스트용)
+    if (!document.getElementById('v106-reset-recv-menu')) {
+      var rb = document.createElement('button');
+      rb.type = 'button';
+      rb.id = 'v106-reset-recv-menu';
+      rb.className = 'menu-item-btn';
+      rb.setAttribute('data-search', '수신 기록 초기화 치트 리셋 reset');
+      rb.textContent = '🔄 제작자 명령 다시 받기';
+      rb.onclick = function () {
+        try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+        if (typeof window.PRANA_RESET_CHEAT_SEEN === 'function') window.PRANA_RESET_CHEAT_SEEN();
+        else {
+          try { localStorage.removeItem('PRANA_CREATOR_SEEN'); } catch (e2) {}
+          alert('기록을 지웠습니다. 새로고침 후 다시 시도하세요.');
+        }
+      };
+      list.appendChild(rb);
+    }
+
     function ensure(id, label, onClick, search) {
       var b = document.getElementById(id);
       if (b) { b.onclick = onClick; return; }
@@ -16940,23 +16959,18 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
 
 
 <script>
-/* 제작자 치트 수신기 — cheat.json 폴링 후 미적용 명령만 1회 적용
-   · 최근 60분 이내 항목: 앱을 나중에 열어도 적용
-   · 그 이전 항목: 중복 지급 방지를 위해 스킵만
-   · SEEN 키로 기기별 1회 보장 */
+/* 제작자 치트 수신기 v2 — 서버에 있고 아직 안 받은 명령은 무조건 1회 적용
+   (시간 스킵 없음 · raw 캐시 우회 · API 우선) */
 (function () {
   var CREATOR_GH_REPO = 'elloyeeh895-web/Blue-Archive-Kibotos-Chat';
-  var GH_API = 'https://api.github.com';
-  var POLL_MS = 10000;
-  var BACKOFF_MS = 120000;
-  var RECENT_MS = 24 * 60 * 60 * 1000;  // 24시간 이내 명령은 늦게 접속해도 적용
+  var POLL_MS = 8000;
+  var BACKOFF_MS = 90000;
   var SEEN_KEY = 'PRANA_CREATOR_SEEN';
   var LABELS = {
     credits: '🪙 크레딧', pyroxene: '💎 청휘석', tickets: '🎫 인연 티켓',
     gifts: '🎁 인연 선물', eligma: '✨ 엘리그마', streak: '🛡️ 연속 지키기권'
   };
   var VALID = { credits: 1, pyroxene: 1, tickets: 1, gifts: 1, eligma: 1, streak: 1 };
-
   if (!/^[^\/\s]+\/[^\/\s]+$/.test(CREATOR_GH_REPO)) return;
 
   function sg(k) {
@@ -16976,35 +16990,32 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
     } catch (e) { return []; }
   }
   function saveSeen(list) {
-    var uniq = [];
-    var map = {};
+    var map = {}, out = [];
     (list || []).forEach(function (id) {
       if (!id || map[id]) return;
-      map[id] = 1;
-      uniq.push(id);
+      map[id] = 1; out.push(id);
     });
-    ss(SEEN_KEY, JSON.stringify(uniq.slice(-120)));
+    ss(SEEN_KEY, JSON.stringify(out.slice(-150)));
   }
   function addKey(key, n, def) {
     var raw = sg(key);
     var cur = raw === '' ? (def || 0) : Math.max(0, Math.floor(Number(raw) || 0));
     ss(key, String(cur + Math.max(0, Math.floor(n || 0))));
   }
-
   function toast(text) {
     var d = document.createElement('div');
     d.textContent = text;
     d.style.cssText = 'position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:2147483647;background:#1e293b;color:#fff;border:1px solid #67e8f9;padding:10px 16px;border-radius:12px;font-size:14px;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.4);max-width:90vw;text-align:center';
     document.body.appendChild(d);
-    setTimeout(function () { d.style.transition = 'opacity .5s'; d.style.opacity = '0'; }, 3200);
-    setTimeout(function () { d.remove(); }, 3800);
+    setTimeout(function () { d.style.transition = 'opacity .5s'; d.style.opacity = '0'; }, 3500);
+    setTimeout(function () { d.remove(); }, 4200);
   }
 
   var noticeQueue = [], noticeShowing = false;
   function showNextNotice() {
     if (noticeShowing || !noticeQueue.length) return;
     noticeShowing = true;
-    var text = noticeQueue.shift();
+    var msg = noticeQueue.shift();
     var d = document.createElement('div');
     d.setAttribute('role', 'alert');
     d.style.cssText = 'position:fixed;left:50%;top:0;transform:translate(-50%,-120%);transition:transform .35s ease;z-index:2147483647;background:linear-gradient(135deg,#1e3a8a,#6d28d9);color:#fff;padding:14px 20px;border-radius:0 0 16px 16px;font-size:15px;font-weight:700;line-height:1.5;box-shadow:0 8px 28px rgba(0,0,0,.5);max-width:92vw;min-width:200px;text-align:center;word-break:break-word';
@@ -17012,14 +17023,14 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
     tag.textContent = '📢 제작자 공지';
     tag.style.cssText = 'font-size:11px;opacity:.8;margin-bottom:4px';
     var body = document.createElement('div');
-    body.textContent = text;
+    body.textContent = msg;
     d.appendChild(tag); d.appendChild(body);
     document.body.appendChild(d);
     requestAnimationFrame(function () {
       requestAnimationFrame(function () { d.style.transform = 'translate(-50%,0)'; });
     });
-    setTimeout(function () { d.style.transform = 'translate(-50%,-120%)'; }, 6000);
-    setTimeout(function () { d.remove(); noticeShowing = false; showNextNotice(); }, 6500);
+    setTimeout(function () { d.style.transform = 'translate(-50%,-120%)'; }, 6500);
+    setTimeout(function () { d.remove(); noticeShowing = false; showNextNotice(); }, 7000);
   }
 
   function applyGrant(g) {
@@ -17062,122 +17073,123 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
     return false;
   }
 
-  var sessionApplied = {};
-  var bootstrapped = false;
+  var sessionDone = {};
 
   function processEntries(entries) {
-    if (!Array.isArray(entries)) return;
-    var now = Date.now();
+    if (!Array.isArray(entries) || !entries.length) return 0;
     var seen = loadSeen();
-    var seenMap = {};
-    seen.forEach(function (id) { seenMap[id] = 1; });
-    var changed = false;
-
+    var map = {};
+    seen.forEach(function (id) { map[id] = 1; });
+    var applied = 0;
     var sorted = entries.slice().sort(function (a, b) {
       return (Number(a && a.ts) || 0) - (Number(b && b.ts) || 0);
     });
-
     sorted.forEach(function (e) {
       if (!e || typeof e.id !== 'string' || !e.id) return;
-      if (seenMap[e.id] || sessionApplied[e.id]) return;
-
-      var ts = Number(e.ts) || 0;
-      var age = ts > 0 ? (now - ts) : 0;
-      // ts 가 없거나 시계 오차 허용. 부트스트랩(첫 폴링)에서는 오래된 것만 스킵
-      var tooOld = false;
-      if (!bootstrapped) {
-        if (ts > 0 && age > RECENT_MS) tooOld = true;
-        // ts 가 미래로 크게 틀어져 있어도 최근으로 취급
-        if (ts > 0 && age < -5 * 60 * 1000) tooOld = false;
-      }
-
-      if (tooOld) {
-        seenMap[e.id] = 1;
-        seen.push(e.id);
-        sessionApplied[e.id] = 1;
-        changed = true;
-        return;
-      }
-
-      sessionApplied[e.id] = 1;
-      seenMap[e.id] = 1;
+      if (map[e.id] || sessionDone[e.id]) return;
+      sessionDone[e.id] = 1;
+      map[e.id] = 1;
       seen.push(e.id);
-      changed = true;
-      try { applyEntry(e); } catch (err) {}
+      try {
+        if (applyEntry(e)) applied++;
+      } catch (err) {}
     });
-
-    if (changed) saveSeen(seen);
-    bootstrapped = true;
+    saveSeen(seen);
+    return applied;
   }
 
-  function fetchCheatText() {
-    var rawUrl = 'https://raw.githubusercontent.com/' + CREATOR_GH_REPO + '/main/cheat.json?t=' + Date.now();
-    return fetch(rawUrl, { cache: 'no-cache', mode: 'cors' }).then(function (r) {
+  function parseEntries(txt) {
+    if (!txt) return [];
+    try {
+      var d = JSON.parse(txt);
+      if (d && Array.isArray(d.entries)) return d.entries;
+      if (Array.isArray(d)) return d;
+    } catch (e) {}
+    return [];
+  }
+
+  function fetchViaApi() {
+    var url = 'https://api.github.com/repos/' + CREATOR_GH_REPO + '/contents/cheat.json?ref=main&_=' + Date.now();
+    return fetch(url, {
+      cache: 'no-store',
+      mode: 'cors',
+      headers: {
+        'Accept': 'application/vnd.github.raw+json',
+        'Cache-Control': 'no-cache'
+      }
+    }).then(function (r) {
+      if (r.status === 404) return '';
+      if (r.status === 403 || r.status === 429) throw new Error('rate');
+      if (!r.ok) throw new Error('api ' + r.status);
+      return r.text();
+    });
+  }
+
+  function fetchViaRaw() {
+    var url = 'https://raw.githubusercontent.com/' + CREATOR_GH_REPO + '/main/cheat.json?_=' + Date.now();
+    return fetch(url, { cache: 'no-store', mode: 'cors' }).then(function (r) {
       if (r.status === 404) return '';
       if (!r.ok) throw new Error('raw ' + r.status);
       return r.text();
-    }).catch(function () {
-      return fetch(GH_API + '/repos/' + CREATOR_GH_REPO + '/contents/cheat.json?ref=main', {
-        cache: 'no-cache',
-        mode: 'cors',
-        headers: { 'Accept': 'application/vnd.github.raw+json' }
-      }).then(function (r) {
-        if (r.status === 404) return '';
-        if (r.status === 403 || r.status === 429) throw new Error('rate');
-        if (!r.ok) throw new Error('http ' + r.status);
-        return r.text();
-      });
     });
+  }
+
+  function fetchCheat() {
+    // API 우선 (캐시 적음). 실패 시 raw
+    return fetchViaApi().catch(function () { return fetchViaRaw(); });
   }
 
   function poll() {
     var delay = POLL_MS;
-    fetchCheatText().then(function (txt) {
-      var entries = [];
-      if (txt) {
-        try {
-          var d = JSON.parse(txt);
-          if (d && Array.isArray(d.entries)) entries = d.entries;
-        } catch (e) {}
-      }
-      processEntries(entries);
-      try {
-        window.__PRANA_CHEAT_LAST = {
-          at: Date.now(),
-          count: entries.length,
-          lastId: entries.length ? entries[entries.length - 1].id : null
-        };
-      } catch (e) {}
+    fetchCheat().then(function (txt) {
+      var entries = parseEntries(txt);
+      var n = processEntries(entries);
+      window.__PRANA_CHEAT_LAST = {
+        at: Date.now(),
+        count: entries.length,
+        applied: n,
+        lastId: entries.length ? (entries[entries.length - 1].id || null) : null,
+        lastType: entries.length ? (entries[entries.length - 1].type || null) : null,
+        lastText: entries.length && entries[entries.length - 1].type === 'notice'
+          ? entries[entries.length - 1].text : null
+      };
     }).catch(function (err) {
-      if (err && String(err.message || err).indexOf('rate') >= 0) delay = BACKOFF_MS;
+      if (err && String(err.message || '').indexOf('rate') >= 0) delay = BACKOFF_MS;
+      window.__PRANA_CHEAT_LAST = { at: Date.now(), error: String(err && err.message || err) };
     }).then(function () {
       setTimeout(poll, delay);
     });
   }
 
-  // 테스트용: 수신 기록 초기화 후 즉시 다시 받음
   window.PRANA_RESET_CHEAT_SEEN = function () {
     try { localStorage.removeItem(SEEN_KEY); } catch (e) {}
-    sessionApplied = {};
-    bootstrapped = false;
-    toast('제작자 명령 수신 기록을 초기화했습니다. 다시 확인합니다…');
-    fetchCheatText().then(function (txt) {
-      var entries = [];
-      if (txt) {
-        try {
-          var d = JSON.parse(txt);
-          if (d && Array.isArray(d.entries)) entries = d.entries;
-        } catch (e) {}
-      }
-      processEntries(entries);
-    }).catch(function () {});
+    sessionDone = {};
+    toast('수신 기록 초기화 — 서버 명령을 다시 받습니다');
+    fetchCheat().then(function (txt) {
+      var n = processEntries(parseEntries(txt));
+      if (n > 0) toast('적용된 명령 ' + n + '개');
+      else toast('새로 적용할 명령 없음 (서버 비어있거나 이미 반영)');
+    }).catch(function () {
+      toast('서버 조회 실패');
+    });
   };
 
-  function connect() { setTimeout(poll, 1500); }
+  window.PRANA_CHEAT_STATUS = function () {
+    var s = window.__PRANA_CHEAT_LAST || {};
+    var seen = loadSeen();
+    return {
+      lastPoll: s,
+      seenCount: seen.length,
+      seenTail: seen.slice(-5)
+    };
+  };
+
+  function connect() { setTimeout(poll, 800); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', connect);
   else connect();
 })();
 </script>
+
 
 
 
@@ -17683,6 +17695,7 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
       '<button type="button" class="main-btn" style="background:#0f766e;margin:0" onclick="window.v106TestToken()">토큰 확인</button>' +
       '<button type="button" class="main-btn" style="background:#7c3aed;margin:0" onclick="window.v106ManualDeploy()">수동 배포</button>' +
       '<button type="button" class="main-btn" style="background:#0369a1;margin:0" onclick="window.v106VerifyServer()">서버 확인</button>' +
+      '<button type="button" class="main-btn" style="background:#b45309;margin:0" onclick="window.v106ResetReceiver()">수신 기록 초기화</button>' +
       '</div>' +
       '<p class="v106-hint" style="text-align:left;margin-top:8px">토큰 쓰기 권한이 없거나 422가 나도 <b>수동 배포</b>로 전 서버에 반영할 수 있습니다. (cheat.json 다운로드 → GitHub에 붙여넣기 → Commit)</p>' +
       '<p class="v106-status" id="v106-cmd-msg"></p>' +
@@ -17936,35 +17949,54 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
 
   window.v106VerifyServer = function () {
     setMsg('v106-cmd-msg', '서버 cheat.json 확인 중…', true);
-    var url = 'https://raw.githubusercontent.com/' + CREATOR_GH_REPO + '/main/' + CHEAT_PATH + '?t=' + Date.now();
-    fetch(url, { cache: 'no-cache' }).then(function (r) {
+    var api = 'https://api.github.com/repos/' + CREATOR_GH_REPO + '/contents/' + CHEAT_PATH + '?ref=main&_=' + Date.now();
+    fetch(api, {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/vnd.github.raw+json', 'Cache-Control': 'no-cache' }
+    }).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    }).then(function (d) {
+      return r.text();
+    }).then(function (txt) {
+      var d = {};
+      try { d = JSON.parse(txt || '{}'); } catch (e) {}
       var entries = (d && d.entries) ? d.entries : [];
       var last = entries.length ? entries[entries.length - 1] : null;
-      var lines = ['서버 항목 수: ' + entries.length];
+      var lines = ['[서버] 항목 수: ' + entries.length];
       if (last) {
-        lines.push('마지막 항목 id: ' + last.id);
+        lines.push('마지막 id: ' + last.id);
         lines.push('type: ' + last.type);
         if (last.type === 'notice') lines.push('text: ' + (last.text || ''));
         if (last.type === 'grant') lines.push((last.currency || '') + ' +' + (last.amount || ''));
-        lines.push('ts: ' + (last.ts || ''));
-      } else {
-        lines.push('항목이 비어 있습니다.');
-      }
+      } else lines.push('항목 없음');
       var mine = window.__v106LastEntry;
       if (mine && mine.id) {
         var found = entries.some(function (e) { return e && e.id === mine.id; });
         lines.push(found
-          ? '✅ 방금 보낸 명령이 서버에 있습니다. 다른 기기는 최대 20초 후 반영됩니다.'
-          : '❌ 방금 보낸 명령이 서버에 없습니다. Commit 이 안 된 상태입니다. 「수동 배포」 후 GitHub에서 Commit 하세요.');
+          ? '✅ 방금 보낸 명령이 서버에 있음 → 다른 기기는 8초마다 확인합니다'
+          : '❌ 방금 보낸 명령이 서버에 없음 → GitHub Commit 이 안 된 상태');
       }
+      lines.push('');
+      lines.push('다른 기기에서 안 보이면 그 기기 메뉴에서');
+      lines.push('「수신 기록 초기화」를 누르세요.');
       setMsg('v106-cmd-msg', lines.join('\n'), true);
     }).catch(function (err) {
       setMsg('v106-cmd-msg', '서버 확인 실패: ' + (err && err.message ? err.message : err), false);
     });
   };
+
+  window.v106ResetReceiver = function () {
+    try {
+      if (typeof window.PRANA_RESET_CHEAT_SEEN === 'function') window.PRANA_RESET_CHEAT_SEEN();
+      else {
+        localStorage.removeItem('PRANA_CREATOR_SEEN');
+        alert('수신 기록을 지웠습니다. 페이지를 새로고침하세요.');
+      }
+      setMsg('v106-cmd-msg', '수신 기록 초기화 완료. 서버 명령을 다시 받는 중…', true);
+    } catch (e) {
+      setMsg('v106-cmd-msg', '초기화 실패: ' + e, false);
+    }
+  };
+
 
   window.v106CopyManual = function (entry) {
     entry = entry || window.__v106LastEntry;
