@@ -16951,7 +16951,7 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
 
   if (!/^[^\/\s]+\/[^\/\s]+$/.test(CREATOR_GH_REPO)) return;
   var SEEN_KEY = 'PRANA_CREATOR_SEEN';
-  var LABELS = { credits: '🪙 크레딧', pyroxene: '💎 청휘석', tickets: '🎫 인연 티켓', gifts: '🎁 인연 선물', eligma: '✨ 엘리그마' };
+  var LABELS = { credits: '🪙 크레딧', pyroxene: '💎 청휘석', tickets: '🎫 인연 티켓', gifts: '🎁 인연 선물', eligma: '✨ 엘리그마', streak: '🛡️ 연속 지키기권' };
 
   function sg(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return (typeof safeGet === 'function') ? safeGet(k) : ''; } }
   function ss(k, v) { try { localStorage.setItem(k, v); } catch (e) { if (typeof safeSet === 'function') safeSet(k, v); } }
@@ -17006,13 +17006,17 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
         if (window.v103 && typeof window.v103.addEligma === 'function') window.v103.addEligma(n);
         else addKey('PRANA_V103_ELIGMA', n, 0);
         break;
+      case 'streak':
+        addKey('PRANA_V94_STREAK_PROTECT', n, 0);
+        try { if (typeof window.refreshStreakProtectUI === 'function') window.refreshStreakProtectUI(); } catch (e) {}
+        break;
       default: return;
     }
     try { if (typeof window.refreshEconomyUI === 'function') window.refreshEconomyUI(); } catch (e) {}
     toast('🛠 제작자 선물! ' + LABELS[g.currency] + ' +' + n.toLocaleString());
   }
 
-  var VALID = { credits: 1, pyroxene: 1, tickets: 1, gifts: 1, eligma: 1 };
+  var VALID = { credits: 1, pyroxene: 1, tickets: 1, gifts: 1, eligma: 1, streak: 1 };
   var known = {};
 
   function handleEntry(key, e) {
@@ -17144,6 +17148,736 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
 })();
 </script>
 
+<script id="v105-hacking-mini-game">
+(function () {
+  'use strict';
+  var SCORE_KEY = 'PRANA_V105_HACKING_RANKING';
+  var game = { active: false, sequence: [], input: [], round: 0, startedAt: 0, endsAt: 0, timer: null, revealTimer: null };
+
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function readScores() {
+    try { var raw = localStorage.getItem(SCORE_KEY); var list = raw ? JSON.parse(raw) : []; return Array.isArray(list) ? list : []; } catch (e) { return []; }
+  }
+  function writeScores(list) { try { localStorage.setItem(SCORE_KEY, JSON.stringify(list.slice(0, 50))); } catch (e) {} }
+  function sortedScores() {
+    return readScores().sort(function (a, b) { return (b.rounds - a.rounds) || (a.time - b.time) || (a.at - b.at); });
+  }
+  function style() {
+    if (document.getElementById('v105-hack-style')) return;
+    var s = document.createElement('style'); s.id = 'v105-hack-style';
+    s.textContent = '\n      #v105-hack-modal .modal-content{max-width:430px}\n      .v105-hack-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}\n      .v105-hack-badge{font-size:12px;font-weight:800;color:#67e8f9;background:#083344;border:1px solid #155e75;border-radius:999px;padding:5px 9px;white-space:nowrap}\n      .v105-hack-status{background:linear-gradient(135deg,#111827,#172554);border:1px solid #1e40af;border-radius:14px;padding:14px;text-align:center;margin-bottom:10px}\n      .v105-hack-timer{font-size:30px;font-weight:900;color:#67e8f9;letter-spacing:.04em}\n      .v105-hack-timer.danger{color:#fb7185;animation:v105-pulse .8s infinite alternate}\n      @keyframes v105-pulse{to{transform:scale(1.06);opacity:.65}}\n      .v105-hack-seq{display:flex;justify-content:center;flex-wrap:wrap;gap:6px;min-height:54px;margin:10px 0;padding:10px;background:#020617;border-radius:10px;border:1px solid #334155}\n      .v105-hack-digit{width:30px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:7px;font-size:20px;font-weight:900;color:#e0f2fe;background:#0f172a;border:1px solid #334155}\n      .v105-hack-digit.on{color:#a7f3d0;background:#064e3b;border-color:#10b981}\n      .v105-hack-keypad{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}\n      .v105-hack-keypad button{padding:15px;border-radius:10px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:22px;font-weight:900;cursor:pointer}\n      .v105-hack-keypad button:active{transform:scale(.96);border-color:#67e8f9}\n      .v105-hack-keypad button:disabled{opacity:.35}\n      .v105-hack-action{width:100%;padding:12px;border:0;border-radius:9px;background:linear-gradient(135deg,#0891b2,#2563eb);color:#fff;font-weight:900;font-size:14px;cursor:pointer}\n      .v105-hack-action:disabled{opacity:.45;cursor:not-allowed}\n      .v105-hack-sub{font-size:11px;color:#94a3b8;line-height:1.55;text-align:center;margin:8px 0}\n      .v105-hack-result{padding:10px;border-radius:9px;background:#0f172a;border:1px solid #334155;text-align:center;font-size:13px;line-height:1.6;margin-bottom:10px}\n      .v105-rank-row{display:grid;grid-template-columns:30px 1fr 65px 55px;gap:5px;align-items:center;padding:9px 4px;border-bottom:1px solid #243044;font-size:12px}\n      .v105-rank-row:first-child{color:#fde68a}.v105-rank-row .rname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}.v105-rank-head{color:#8a9bb0;font-size:10px;border-bottom:1px solid #334155}\n    ';
+    document.head.appendChild(s);
+  }
+  function ensureModal() {
+    if (document.getElementById('v105-hack-modal')) return;
+    style();
+    var m = document.createElement('div'); m.className = 'modal'; m.id = 'v105-hack-modal';
+    m.innerHTML = '<div class="modal-content">' +
+      '<div class="v105-hack-head"><h3 style="margin:0">🛡️ 해킹 미니게임</h3><span class="v105-hack-badge" id="v105-hack-round">대기 중</span></div>' +
+      '<div id="v105-hack-view">' +
+      '<div class="v105-hack-status"><div style="font-size:12px;color:#cbd5e1">남은 시간</div><div class="v105-hack-timer" id="v105-hack-time">45.0</div><div style="font-size:11px;color:#94a3b8">라운드 <span id="v105-hack-round-num">0</span> · 입력 <span id="v105-hack-progress">0/0</span></div></div>' +
+      '<div class="v105-hack-sub" id="v105-hack-guide">1과 0의 순서를 기억한 뒤, 숨겨지면 같은 순서로 입력하세요.</div>' +
+      '<div class="v105-hack-seq" id="v105-hack-seq"></div>' +
+      '<div class="v105-hack-keypad"><button type="button" id="v105-hack-zero" onclick="window.v105HackInput(0)" disabled>0</button><button type="button" id="v105-hack-one" onclick="window.v105HackInput(1)" disabled>1</button></div>' +
+      '<button type="button" class="v105-hack-action" id="v105-hack-execute" onclick="window.v105HackExecute()" disabled>🔓 해킹 실행</button>' +
+      '</div>' +
+      '<div id="v105-hack-result" class="v105-hack-result" style="display:none"></div>' +
+      '<label style="margin-top:6px">랭킹에 표시할 이름</label><input id="v105-hack-name" maxlength="16" placeholder="선생님" autocomplete="off">' +
+      '<button type="button" class="main-btn" style="background:#0f766e;margin-top:8px" onclick="window.v105OpenHackRanking()">🏆 해킹 랭킹 보기</button>' +
+      '<button type="button" class="main-btn" style="background:#334155;margin-top:6px" onclick="window.v105CloseHack()">닫기</button>' +
+      '</div>';
+    document.body.appendChild(m);
+  }
+  function setText(id, text) { var e = document.getElementById(id); if (e) e.textContent = text; }
+  function renderSequence(show) {
+    var box = document.getElementById('v105-hack-seq'); if (!box) return;
+    box.innerHTML = game.sequence.map(function (n, i) { return '<span class="v105-hack-digit ' + (show ? 'on' : '') + '">' + (show ? n : '•') + '</span>'; }).join('');
+  }
+  function updateTimer() {
+    if (!game.active) return;
+    var left = Math.max(0, game.endsAt - Date.now());
+    var sec = left / 1000; setText('v105-hack-time', sec.toFixed(1));
+    var timer = document.getElementById('v105-hack-time'); if (timer) timer.classList.toggle('danger', sec <= 10);
+    if (left <= 0) finish(false, '시간이 끝났습니다.');
+  }
+  function newRound() {
+    if (!game.active) return;
+    if (game.revealTimer) clearTimeout(game.revealTimer);
+    var len = Math.min(10, 4 + game.round);
+    game.sequence = Array.from({ length: len }, function () { return Math.random() < .5 ? 0 : 1; });
+    game.input = []; game.round += 1;
+    setText('v105-hack-round', 'ROUND ' + game.round); setText('v105-hack-round-num', String(game.round)); setText('v105-hack-progress', '0/' + len);
+    renderSequence(true);
+    document.getElementById('v105-hack-zero').disabled = true; document.getElementById('v105-hack-one').disabled = true; document.getElementById('v105-hack-execute').disabled = true;
+    setText('v105-hack-guide', '숫자 배열을 기억하세요… 잠시 후 입력 화면으로 바뀝니다.');
+    game.revealTimer = setTimeout(function () {
+      if (!game.active) return; renderSequence(false);
+      document.getElementById('v105-hack-zero').disabled = false; document.getElementById('v105-hack-one').disabled = false;
+      setText('v105-hack-guide', '순서대로 0 또는 1을 입력한 뒤 해킹 실행을 누르세요.');
+    }, 1300);
+  }
+  function start() {
+    ensureModal();
+    game.active = true; game.round = 0; game.startedAt = Date.now(); game.endsAt = game.startedAt + 45000;
+    document.getElementById('v105-hack-result').style.display = 'none'; document.getElementById('v105-hack-view').style.display = 'block';
+    if (game.timer) clearInterval(game.timer); game.timer = setInterval(updateTimer, 100);
+    newRound(); updateTimer();
+  }
+  function finish(success, message) {
+    if (!game.active) return;
+    game.active = false; if (game.timer) clearInterval(game.timer); if (game.revealTimer) clearTimeout(game.revealTimer);
+    document.getElementById('v105-hack-zero').disabled = true; document.getElementById('v105-hack-one').disabled = true; document.getElementById('v105-hack-execute').disabled = true;
+    var rounds = success ? game.round : Math.max(0, game.round - 1); var used = Math.min(45, (Date.now() - game.startedAt) / 1000);
+    var result = document.getElementById('v105-hack-result'); result.style.display = 'block';
+    result.innerHTML = '<strong>' + (success ? '✅ ' : '⏱️ ') + esc(message) + '</strong><br>완료 라운드: <b>' + rounds + '회</b> · 기록 시간: ' + used.toFixed(1) + '초';
+    if (rounds > 0) {
+      var name = (document.getElementById('v105-hack-name').value || '').trim().slice(0, 16) || '선생님';
+      var scores = readScores(); scores.push({ name: name, rounds: rounds, time: Number(used.toFixed(1)), at: Date.now() });
+      scores.sort(function (a, b) { return (b.rounds - a.rounds) || (a.time - b.time) || (a.at - b.at); });
+      writeScores(scores);
+    }
+    setText('v105-hack-round', '기록 완료');
+  }
+  window.v105HackInput = function (digit) {
+    if (!game.active || game.input.length >= game.sequence.length) return;
+    game.input.push(Number(digit)); setText('v105-hack-progress', game.input.length + '/' + game.sequence.length);
+    var nodes = document.querySelectorAll('#v105-hack-seq .v105-hack-digit'); if (nodes[game.input.length - 1]) { nodes[game.input.length - 1].textContent = digit; nodes[game.input.length - 1].classList.add('on'); }
+    if (game.input.length === game.sequence.length) document.getElementById('v105-hack-execute').disabled = false;
+  };
+  window.v105HackExecute = function () {
+    if (!game.active || game.input.length !== game.sequence.length) return;
+    var ok = game.input.every(function (v, i) { return v === game.sequence[i]; });
+    if (!ok) { finish(false, '배열이 틀렸습니다.'); return; }
+    setText('v105-hack-guide', '접속 성공! 다음 배열을 생성하는 중…'); newRound();
+  };
+  window.v105OpenHack = function () { try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {} ensureModal(); document.getElementById('v105-hack-modal').style.display = 'flex'; start(); };
+  window.v105CloseHack = function () { if (game.active && !confirm('진행 중인 기록을 포기하고 닫을까요?')) return; game.active = false; if (game.timer) clearInterval(game.timer); if (game.revealTimer) clearTimeout(game.revealTimer); var m = document.getElementById('v105-hack-modal'); if (m) m.style.display = 'none'; };
+  window.v105OpenHackRanking = function () {
+    ensureModal(); var scores = sortedScores(); var result = document.getElementById('v105-hack-result'); result.style.display = 'block';
+    var rows = scores.length ? scores.slice(0, 10).map(function (s, i) { return '<div class="v105-rank-row"><b>' + (i + 1) + '</b><span class="rname">' + esc(s.name) + '</span><b>' + s.rounds + '회</b><span>' + Number(s.time).toFixed(1) + 's</span></div>'; }).join('') : '<div style="padding:18px;color:#94a3b8">아직 기록이 없습니다. 첫 기록을 남겨 보세요.</div>';
+    result.innerHTML = '<div style="font-weight:800;margin-bottom:8px">🏆 해킹 랭킹 <span style="font-size:11px;color:#94a3b8;font-weight:400">(라운드 수 우선 · 동률은 시간순)</span></div>' + '<div class="v105-rank-row v105-rank-head"><span>#</span><span>이름</span><span>라운드</span><span>시간</span></div>' + rows;
+  };
+  function injectMenu() {
+    var list = document.querySelector('#main-menu-modal .menu-list'); if (!list || document.getElementById('v105-hack-menu')) return;
+    var b = document.createElement('button'); b.type = 'button'; b.id = 'v105-hack-menu'; b.className = 'menu-item-btn'; b.textContent = '🛡️ 해킹 미니게임 · 랭킹'; b.onclick = window.v105OpenHack;
+    var charBtn = Array.from(list.querySelectorAll('.menu-item-btn')).find(function (el) { return (el.textContent || '').indexOf('대화 상대 선택') >= 0; }); if (charBtn) list.insertBefore(b, charBtn); else list.appendChild(b);
+  }
+  function boot() { injectMenu(); setInterval(injectMenu, 1200); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
+
+
+<script id="v106-creator-auth-commands">
+/* v10.6: 제작자 인증 + 명령어 쓰기 (재화 수량 조절 / 전 서버 치트·공지) */
+(function () {
+  'use strict';
+  var AUTH_KEY = 'PRANA_CREATOR_AUTH';
+  var AUTH_CODE = 'git*****Dk';
+  var GH_TOKEN_KEY = 'PRANA_CREATOR_GH_TOKEN';
+  var CREATOR_GH_REPO = 'elloyeeh895-web/Blue-Archive-Kibotos-Chat';
+  var CHEAT_PATH = 'cheat.json';
+
+  var CURRENCY_MAP = {
+    '청휘석': 'pyroxene', 'pyroxene': 'pyroxene', 'pyro': 'pyroxene',
+    '크레딧': 'credits', 'credits': 'credits', 'credit': 'credits',
+    '엘리그마': 'eligma', 'eligma': 'eligma',
+    '인연티켓': 'tickets', '인연 티켓': 'tickets', '티켓': 'tickets', 'tickets': 'tickets', 'ticket': 'tickets',
+    '인연선물': 'gifts', '인연 선물': 'gifts', '선물': 'gifts', 'gifts': 'gifts', 'gift': 'gifts',
+    '연속지키기권': 'streak', '연속 지키기권': 'streak', '지키기권': 'streak', 'streak': 'streak', 'protect': 'streak'
+  };
+  var LABELS = {
+    pyroxene: '💎 청휘석', credits: '🪙 크레딧', eligma: '✨ 엘리그마',
+    tickets: '🎫 인연 티켓', gifts: '🎁 인연 선물', streak: '🛡️ 연속 지키기권'
+  };
+  var CURRENCY_OPTIONS = [
+    { id: 'pyroxene', label: '💎 청휘석' },
+    { id: 'credits', label: '🪙 크레딧' },
+    { id: 'eligma', label: '✨ 엘리그마' },
+    { id: 'tickets', label: '🎫 인연 티켓' },
+    { id: 'gifts', label: '🎁 인연 선물' },
+    { id: 'streak', label: '🛡️ 연속 지키기권' }
+  ];
+  var QUICK_AMOUNTS = [1, 10, 50, 100, 500, 1000, 5000, 10000];
+
+  function sg(k) {
+    try { return localStorage.getItem(k) || ''; } catch (e) {
+      return (typeof safeGet === 'function') ? (safeGet(k) || '') : '';
+    }
+  }
+  function ss(k, v) {
+    try { localStorage.setItem(k, String(v)); } catch (e) {
+      if (typeof safeSet === 'function') safeSet(k, String(v));
+    }
+  }
+  function isAuthed() { return sg(AUTH_KEY) === '1'; }
+  function setAuthed(on) { ss(AUTH_KEY, on ? '1' : '0'); }
+
+  function addKey(key, n, def) {
+    var raw = sg(key);
+    var cur = raw === '' ? (def || 0) : Math.max(0, Math.floor(Number(raw) || 0));
+    var next = cur + Math.max(0, Math.floor(n || 0));
+    ss(key, String(next));
+    return next;
+  }
+
+  function getBalance(currency) {
+    switch (currency) {
+      case 'credits': return Math.max(0, Math.floor(Number(sg('PRANA_SCHALE_CREDITS') || 0) || 0));
+      case 'pyroxene': return Math.max(0, Math.floor(Number(sg('PRANA_PYROXENE') || 0) || 0));
+      case 'tickets': return Math.max(0, Math.floor(Number(sg('PRANA_BOND_TICKETS') || 50) || 0));
+      case 'gifts': return Math.max(0, Math.floor(Number(sg('PRANA_BOND_GIFTS') || 0) || 0));
+      case 'eligma':
+        if (window.v103 && typeof window.v103.getEligma === 'function') return window.v103.getEligma();
+        return Math.max(0, Math.floor(Number(sg('PRANA_V103_ELIGMA') || 0) || 0));
+      case 'streak': return Math.max(0, Math.floor(Number(sg('PRANA_V94_STREAK_PROTECT') || 0) || 0));
+      default: return 0;
+    }
+  }
+
+  function applyLocalGrant(currency, amount) {
+    var n = Math.floor(Number(amount) || 0);
+    if (!isFinite(n) || n === 0 || Math.abs(n) > 99999999) return false;
+    // allow negative for set/adjust via delta; clamp result >= 0 handled in setters
+    switch (currency) {
+      case 'credits':
+        if (n > 0 && typeof window.addCredits === 'function') window.addCredits(n);
+        else {
+          var c = getBalance('credits') + n;
+          ss('PRANA_SCHALE_CREDITS', String(Math.max(0, c)));
+        }
+        break;
+      case 'pyroxene':
+        if (n > 0 && typeof window.addPyroxene === 'function') window.addPyroxene(n);
+        else {
+          var p = getBalance('pyroxene') + n;
+          ss('PRANA_PYROXENE', String(Math.max(0, p)));
+        }
+        break;
+      case 'tickets':
+        ss('PRANA_BOND_TICKETS', String(Math.max(0, getBalance('tickets') + n)));
+        break;
+      case 'gifts':
+        if (n > 0 && typeof window.addGifts === 'function') window.addGifts(n);
+        else ss('PRANA_BOND_GIFTS', String(Math.max(0, getBalance('gifts') + n)));
+        break;
+      case 'eligma':
+        if (n > 0 && window.v103 && typeof window.v103.addEligma === 'function') window.v103.addEligma(n);
+        else if (n > 0 && typeof window.addEligma === 'function') window.addEligma(n);
+        else ss('PRANA_V103_ELIGMA', String(Math.max(0, getBalance('eligma') + n)));
+        break;
+      case 'streak':
+        ss('PRANA_V94_STREAK_PROTECT', String(Math.max(0, getBalance('streak') + n)));
+        try { if (typeof window.refreshStreakProtectUI === 'function') window.refreshStreakProtectUI(); } catch (e) {}
+        break;
+      default:
+        return false;
+    }
+    try { if (typeof window.refreshEconomyUI === 'function') window.refreshEconomyUI(); } catch (e) {}
+    return true;
+  }
+
+  function setLocalAbsolute(currency, amount) {
+    var n = Math.max(0, Math.floor(Number(amount) || 0));
+    if (n > 99999999) n = 99999999;
+    switch (currency) {
+      case 'credits': ss('PRANA_SCHALE_CREDITS', String(n)); break;
+      case 'pyroxene': ss('PRANA_PYROXENE', String(n)); break;
+      case 'tickets': ss('PRANA_BOND_TICKETS', String(n)); break;
+      case 'gifts': ss('PRANA_BOND_GIFTS', String(n)); break;
+      case 'eligma': ss('PRANA_V103_ELIGMA', String(n)); break;
+      case 'streak':
+        ss('PRANA_V94_STREAK_PROTECT', String(n));
+        try { if (typeof window.refreshStreakProtectUI === 'function') window.refreshStreakProtectUI(); } catch (e) {}
+        break;
+      default: return false;
+    }
+    try { if (typeof window.refreshEconomyUI === 'function') window.refreshEconomyUI(); } catch (e) {}
+    return true;
+  }
+
+  function showBanner(text) {
+    var d = document.createElement('div');
+    d.setAttribute('role', 'alert');
+    d.style.cssText = 'position:fixed;left:50%;top:0;transform:translate(-50%,-120%);transition:transform .35s ease;z-index:2147483647;background:linear-gradient(135deg,#1e3a8a,#6d28d9);color:#fff;padding:14px 20px;border-radius:0 0 16px 16px;font-size:15px;font-weight:700;line-height:1.5;box-shadow:0 8px 28px rgba(0,0,0,.5);max-width:92vw;min-width:200px;text-align:center;word-break:break-word';
+    var tag = document.createElement('div');
+    tag.textContent = '📢 제작자 공지';
+    tag.style.cssText = 'font-size:11px;opacity:.8;margin-bottom:4px';
+    var body = document.createElement('div');
+    body.textContent = String(text || '').slice(0, 200);
+    d.appendChild(tag); d.appendChild(body);
+    document.body.appendChild(d);
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { d.style.transform = 'translate(-50%,0)'; });
+    });
+    setTimeout(function () { d.style.transform = 'translate(-50%,-120%)'; }, 6000);
+    setTimeout(function () { d.remove(); }, 6500);
+  }
+
+  function toast(text) {
+    var d = document.createElement('div');
+    d.textContent = text;
+    d.style.cssText = 'position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:2147483647;background:#1e293b;color:#fff;border:1px solid #67e8f9;padding:10px 16px;border-radius:12px;font-size:14px;font-weight:700;box-shadow:0 6px 24px rgba(0,0,0,.4);max-width:90vw;text-align:center';
+    document.body.appendChild(d);
+    setTimeout(function () { d.style.transition = 'opacity .5s'; d.style.opacity = '0'; }, 2800);
+    setTimeout(function () { d.remove(); }, 3400);
+  }
+
+  function parseCommand(raw) {
+    var s = String(raw || '').trim();
+    if (!s) return { error: '명령어를 입력해 주세요.' };
+    var m = s.match(/^[《<]?\s*all\.(.+?)[》>]?\s*$/i);
+    if (!m) m = s.match(/^all\.(.+)$/i);
+    if (!m) return { error: '형식: 《all.청휘석:1000》 또는 《all.m:공지 내용》' };
+    var body = m[1].trim();
+    if (/^m\s*[:：]/i.test(body)) {
+      var msg = body.replace(/^m\s*[:：]\s*/i, '').trim();
+      if (!msg) return { error: '공지 내용이 비어 있습니다.' };
+      return { type: 'notice', text: msg.slice(0, 200) };
+    }
+    var parts = body.split(/[:：]/);
+    if (parts.length < 2) return { error: '형식: 《all.재화이름:수량》' };
+    var name = parts[0].trim();
+    var amount = Math.floor(Number(parts.slice(1).join(':').trim()));
+    if (!isFinite(amount) || amount <= 0) return { error: '지급 수량이 올바르지 않습니다.' };
+    var key = CURRENCY_MAP[name.replace(/\s+/g, '')] || CURRENCY_MAP[name] || CURRENCY_MAP[name.toLowerCase()];
+    if (!key) return { error: '알 수 없는 재화: ' + name };
+    return { type: 'grant', currency: key, amount: amount };
+  }
+
+  function ensureStyle() {
+    if (document.getElementById('v106-creator-style')) return;
+    var s = document.createElement('style');
+    s.id = 'v106-creator-style';
+    s.textContent = [
+      '#v106-auth-modal .modal-content,#v106-cmd-modal .modal-content{max-width:420px}',
+      '.v106-hint{font-size:12px;color:#8a9bb0;line-height:1.55;margin-bottom:10px;text-align:center}',
+      '.v106-ex{font-size:11px;color:#a78bfa;background:var(--bg-color);border:1px solid var(--border-color);border-radius:8px;padding:8px 10px;margin-bottom:10px;line-height:1.55;text-align:left}',
+      '.v106-status{font-size:12px;text-align:center;min-height:18px;margin:8px 0;color:var(--accent-color);font-weight:700;white-space:pre-line}',
+      '.v106-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}',
+      '.v106-row .main-btn{flex:1;margin:0;min-width:100px}',
+      '.v106-bal{font-size:12px;color:var(--accent-color);font-weight:700;text-align:center;margin:4px 0 10px}',
+      '.v106-quick{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}',
+      '.v106-qbtn{padding:6px 10px;border-radius:999px;border:1px solid var(--border-color);background:var(--bg-color);color:var(--text-color);font-size:12px;font-weight:700;cursor:pointer}',
+      '.v106-qbtn:active{border-color:var(--accent-color);transform:scale(.96)}',
+      '.v106-tabs{display:flex;gap:6px;margin-bottom:10px}',
+      '.v106-tab{flex:1;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-color);color:var(--text-color);font-size:12px;font-weight:700;cursor:pointer}',
+      '.v106-tab.on{border-color:var(--accent-color);background:var(--accent-color);color:#fff}',
+      '.v106-panel{display:none}',
+      '.v106-panel.on{display:block}',
+      'select.v106-select{width:100%;padding:10px;background:var(--bg-color);border:1px solid var(--border-color);color:var(--text-color);border-radius:6px;margin-bottom:10px;font-size:14px}',
+      '.v106-amt-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}',
+      '.v106-amt-row input{flex:1;margin-bottom:0}',
+      '.v106-amt-row button{padding:10px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-color);color:var(--text-color);font-weight:700;cursor:pointer;font-size:16px}'
+    ].join('');
+    document.head.appendChild(s);
+  }
+
+  function ensureAuthModal() {
+    if (document.getElementById('v106-auth-modal')) return;
+    ensureStyle();
+    var m = document.createElement('div');
+    m.className = 'modal';
+    m.id = 'v106-auth-modal';
+    m.innerHTML = '<div class="modal-content"></div>';
+    document.body.appendChild(m);
+    m.addEventListener('click', function (ev) { if (ev.target === m) window.v106CloseAuth(); });
+  }
+
+  function renderAuthModal() {
+    ensureAuthModal();
+    var box = document.querySelector('#v106-auth-modal .modal-content');
+    if (!box) return;
+    box.innerHTML =
+      '<h3>🔑 제작자 인증</h3>' +
+      '<p class="v106-hint">제작자 전용 코드를 입력하면<br>히든 설정 「명령어 쓰기」가 해금됩니다.</p>' +
+      '<label for="v106-auth-input">인증 코드</label>' +
+      '<input type="password" id="v106-auth-input" placeholder="제작자 코드를 입력하세요..." autocomplete="off" onkeydown="if(event.key===\'Enter\')window.v106SubmitAuth()">' +
+      '<p class="v106-status" id="v106-auth-msg"></p>' +
+      '<button type="button" class="main-btn" onclick="window.v106SubmitAuth()">인증하기</button>' +
+      (isAuthed()
+        ? '<button type="button" class="main-btn" style="background:#7f1d1d;margin-top:8px" onclick="window.v106RevokeAuth()">인증 해제</button>'
+        : '') +
+      '<button type="button" class="main-btn" style="background:#334155;margin-top:8px" onclick="window.v106CloseAuth()">닫기</button>';
+  }
+
+  function ensureCmdModal() {
+    if (document.getElementById('v106-cmd-modal')) return;
+    ensureStyle();
+    var m = document.createElement('div');
+    m.className = 'modal';
+    m.id = 'v106-cmd-modal';
+    var opts = CURRENCY_OPTIONS.map(function (c) {
+      return '<option value="' + c.id + '">' + c.label + '</option>';
+    }).join('');
+    var quick = QUICK_AMOUNTS.map(function (n) {
+      return '<button type="button" class="v106-qbtn" onclick="window.v106SetAmount(' + n + ')">' + n.toLocaleString() + '</button>';
+    }).join('');
+    m.innerHTML =
+      '<div class="modal-content">' +
+      '<h3>⌨️ 명령어 쓰기</h3>' +
+      '<p class="v106-hint">온라인 플레이어 전원(및 본인)에게 적용됩니다.</p>' +
+      '<div class="v106-tabs">' +
+      '<button type="button" class="v106-tab on" data-tab="grant" onclick="window.v106CmdTab(\'grant\')">재화 지급</button>' +
+      '<button type="button" class="v106-tab" data-tab="set" onclick="window.v106CmdTab(\'set\')">수량 설정</button>' +
+      '<button type="button" class="v106-tab" data-tab="notice" onclick="window.v106CmdTab(\'notice\')">공지</button>' +
+      '<button type="button" class="v106-tab" data-tab="raw" onclick="window.v106CmdTab(\'raw\')">직접 입력</button>' +
+      '</div>' +
+      '<div class="v106-panel on" id="v106-panel-grant">' +
+      '<label>재화 종류</label>' +
+      '<select class="v106-select" id="v106-currency" onchange="window.v106RefreshBal()">' + opts + '</select>' +
+      '<div class="v106-bal" id="v106-balance">현재 보유: —</div>' +
+      '<label>지급 수량</label>' +
+      '<div class="v106-amt-row">' +
+      '<button type="button" onclick="window.v106NudgeAmount(-1)">−</button>' +
+      '<input type="number" id="v106-amount" min="1" max="99999999" value="1000" inputmode="numeric">' +
+      '<button type="button" onclick="window.v106NudgeAmount(1)">＋</button>' +
+      '</div>' +
+      '<div class="v106-quick">' + quick + '</div>' +
+      '<button type="button" class="main-btn" onclick="window.v106GrantSelected()">전 서버에 지급</button>' +
+      '</div>' +
+      '<div class="v106-panel" id="v106-panel-set">' +
+      '<label>재화 종류</label>' +
+      '<select class="v106-select" id="v106-set-currency" onchange="window.v106RefreshBalSet()">' + opts + '</select>' +
+      '<div class="v106-bal" id="v106-set-balance">현재 보유: —</div>' +
+      '<label>목표 수량 (본인 로컬 절대값)</label>' +
+      '<div class="v106-amt-row">' +
+      '<button type="button" onclick="window.v106NudgeSet(-1)">−</button>' +
+      '<input type="number" id="v106-set-amount" min="0" max="99999999" value="0" inputmode="numeric">' +
+      '<button type="button" onclick="window.v106NudgeSet(1)">＋</button>' +
+      '</div>' +
+      '<div class="v106-quick">' +
+      QUICK_AMOUNTS.map(function (n) {
+        return '<button type="button" class="v106-qbtn" onclick="window.v106SetSetAmount(' + n + ')">' + n.toLocaleString() + '</button>';
+      }).join('') +
+      '<button type="button" class="v106-qbtn" onclick="window.v106SetSetAmount(0)">0</button>' +
+      '</div>' +
+      '<p class="v106-hint" style="text-align:left">수량 설정은 본인 기기에만 적용됩니다. 전 서버 지급은 「재화 지급」 탭을 사용하세요.</p>' +
+      '<button type="button" class="main-btn" onclick="window.v106SetSelected()">이 수량으로 설정</button>' +
+      '</div>' +
+      '<div class="v106-panel" id="v106-panel-notice">' +
+      '<label>공지 내용</label>' +
+      '<input type="text" id="v106-notice" maxlength="200" placeholder="플레이어 화면 위에 표시할 메시지">' +
+      '<button type="button" class="main-btn" style="margin-top:8px" onclick="window.v106SendNotice()">공지 보내기</button>' +
+      '</div>' +
+      '<div class="v106-panel" id="v106-panel-raw">' +
+      '<div class="v106-ex">《all.청휘석:1000》 · 《all.크레딧:500》 · 《all.m:점검 안내》</div>' +
+      '<label>명령어</label>' +
+      '<input type="text" id="v106-cmd-input" placeholder="《all.청휘석:1000》" onkeydown="if(event.key===\'Enter\')window.v106RunCommand()">' +
+      '<button type="button" class="main-btn" style="margin-top:8px" onclick="window.v106RunCommand()">실행</button>' +
+      '</div>' +
+      '<label for="v106-gh-token" style="margin-top:12px">GitHub 토큰 (전 서버 배포용, 선택)</label>' +
+      '<input type="password" id="v106-gh-token" placeholder="repo 권한 PAT (이 기기에만 저장)" autocomplete="off">' +
+      '<p class="v106-status" id="v106-cmd-msg"></p>' +
+      '<button type="button" class="main-btn" style="background:#334155" onclick="window.v106CloseCmd()">닫기</button>' +
+      '</div>';
+    document.body.appendChild(m);
+    m.addEventListener('click', function (ev) { if (ev.target === m) window.v106CloseCmd(); });
+  }
+
+  function setMsg(id, text, ok) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.style.color = ok ? '#22c55e' : '#f87171';
+    el.textContent = text || '';
+  }
+
+  function b64utf8(str) {
+    return btoa(unescape(encodeURIComponent(str)));
+  }
+
+  function markSeen(entryId) {
+    try {
+      var seen = [];
+      try { seen = JSON.parse(sg('PRANA_CREATOR_SEEN') || '[]'); } catch (e) { seen = []; }
+      if (!Array.isArray(seen)) seen = [];
+      seen.push(entryId);
+      ss('PRANA_CREATOR_SEEN', JSON.stringify(seen.slice(-50)));
+    } catch (e) {}
+  }
+
+  function pushCheatEntry(entry) {
+    var token = (document.getElementById('v106-gh-token') && document.getElementById('v106-gh-token').value) || sg(GH_TOKEN_KEY) || '';
+    token = String(token).trim();
+    if (token) ss(GH_TOKEN_KEY, token);
+    if (!token) return Promise.resolve({ pushed: false, reason: 'no_token' });
+    var api = 'https://api.github.com/repos/' + CREATOR_GH_REPO + '/contents/' + CHEAT_PATH;
+    return fetch(api, {
+      headers: { 'Accept': 'application/vnd.github+json', 'Authorization': 'Bearer ' + token },
+      cache: 'no-cache'
+    }).then(function (r) {
+      if (r.status === 404) return { sha: null, data: { entries: [] } };
+      if (!r.ok) throw new Error('GitHub 읽기 실패 (' + r.status + ')');
+      return r.json().then(function (j) {
+        var raw = '';
+        try { raw = decodeURIComponent(escape(atob(j.content.replace(/\n/g, '')))); }
+        catch (e) { try { raw = atob(j.content.replace(/\n/g, '')); } catch (e2) { raw = ''; } }
+        var data = { entries: [] };
+        try { data = JSON.parse(raw) || data; } catch (e) {}
+        if (!Array.isArray(data.entries)) data.entries = [];
+        return { sha: j.sha, data: data };
+      });
+    }).then(function (pack) {
+      pack.data.entries.push(entry);
+      if (pack.data.entries.length > 80) pack.data.entries = pack.data.entries.slice(-80);
+      var body = JSON.stringify({
+        message: 'creator command ' + (entry.id || ''),
+        content: b64utf8(JSON.stringify(pack.data, null, 2)),
+        sha: pack.sha || undefined
+      });
+      return fetch(api, {
+        method: 'PUT',
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        },
+        body: body
+      }).then(function (r) {
+        if (!r.ok) throw new Error('GitHub 쓰기 실패 (' + r.status + ')');
+        return { pushed: true };
+      });
+    });
+  }
+
+  function finishGrant(entry, localLabel) {
+    markSeen(entry.id);
+    setMsg('v106-cmd-msg', localLabel + '\n전 서버 배포 중…', true);
+    pushCheatEntry(entry).then(function (res) {
+      if (res && res.pushed) setMsg('v106-cmd-msg', localLabel + '\n✅ 전 서버(cheat.json) 배포 완료', true);
+      else setMsg('v106-cmd-msg', localLabel + '\n✅ 로컬 적용 완료 (토큰 없음 → 전 서버 배포 생략)', true);
+      window.v106RefreshBal();
+      window.v106RefreshBalSet();
+    }).catch(function (err) {
+      setMsg('v106-cmd-msg', localLabel + '\n전 서버 배포 실패: ' + (err && err.message ? err.message : '오류'), false);
+      window.v106RefreshBal();
+      window.v106RefreshBalSet();
+    });
+  }
+
+  window.v106CmdTab = function (tab) {
+    var tabs = document.querySelectorAll('#v106-cmd-modal .v106-tab');
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].classList.toggle('on', tabs[i].getAttribute('data-tab') === tab);
+    }
+    ['grant', 'set', 'notice', 'raw'].forEach(function (id) {
+      var p = document.getElementById('v106-panel-' + id);
+      if (p) p.classList.toggle('on', id === tab);
+    });
+    if (tab === 'grant') window.v106RefreshBal();
+    if (tab === 'set') window.v106RefreshBalSet();
+  };
+
+  window.v106RefreshBal = function () {
+    var sel = document.getElementById('v106-currency');
+    var el = document.getElementById('v106-balance');
+    if (!sel || !el) return;
+    var cur = sel.value;
+    el.textContent = '현재 보유: ' + (LABELS[cur] || cur) + ' ' + getBalance(cur).toLocaleString();
+  };
+  window.v106RefreshBalSet = function () {
+    var sel = document.getElementById('v106-set-currency');
+    var el = document.getElementById('v106-set-balance');
+    var input = document.getElementById('v106-set-amount');
+    if (!sel || !el) return;
+    var cur = sel.value;
+    var bal = getBalance(cur);
+    el.textContent = '현재 보유: ' + (LABELS[cur] || cur) + ' ' + bal.toLocaleString();
+    if (input && document.activeElement !== input) input.value = String(bal);
+  };
+  window.v106SetAmount = function (n) {
+    var input = document.getElementById('v106-amount');
+    if (input) input.value = String(Math.max(1, Math.floor(n)));
+  };
+  window.v106SetSetAmount = function (n) {
+    var input = document.getElementById('v106-set-amount');
+    if (input) input.value = String(Math.max(0, Math.floor(n)));
+  };
+  window.v106NudgeAmount = function (d) {
+    var input = document.getElementById('v106-amount');
+    if (!input) return;
+    var v = Math.max(1, Math.floor(Number(input.value) || 0) + d);
+    input.value = String(v);
+  };
+  window.v106NudgeSet = function (d) {
+    var input = document.getElementById('v106-set-amount');
+    if (!input) return;
+    var v = Math.max(0, Math.floor(Number(input.value) || 0) + d);
+    input.value = String(v);
+  };
+
+  window.v106GrantSelected = function () {
+    if (!isAuthed()) return;
+    var sel = document.getElementById('v106-currency');
+    var input = document.getElementById('v106-amount');
+    var currency = sel ? sel.value : 'pyroxene';
+    var amount = Math.floor(Number(input && input.value));
+    if (!isFinite(amount) || amount <= 0) {
+      setMsg('v106-cmd-msg', '지급 수량을 1 이상으로 입력해 주세요.', false);
+      return;
+    }
+    applyLocalGrant(currency, amount);
+    toast('🛠 ' + (LABELS[currency] || '') + ' +' + amount.toLocaleString());
+    var entryId = 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+    var entry = { id: entryId, type: 'grant', currency: currency, amount: amount, ts: Date.now() };
+    finishGrant(entry, (LABELS[currency] || currency) + ' +' + amount.toLocaleString() + ' 로컬 지급 완료');
+  };
+
+  window.v106SetSelected = function () {
+    if (!isAuthed()) return;
+    var sel = document.getElementById('v106-set-currency');
+    var input = document.getElementById('v106-set-amount');
+    var currency = sel ? sel.value : 'credits';
+    var amount = Math.floor(Number(input && input.value));
+    if (!isFinite(amount) || amount < 0) {
+      setMsg('v106-cmd-msg', '수량을 0 이상으로 입력해 주세요.', false);
+      return;
+    }
+    setLocalAbsolute(currency, amount);
+    toast('설정: ' + (LABELS[currency] || '') + ' = ' + amount.toLocaleString());
+    setMsg('v106-cmd-msg', '✅ 본인 기기 ' + (LABELS[currency] || currency) + ' 을(를) ' + amount.toLocaleString() + ' 으로 설정했습니다.', true);
+    window.v106RefreshBal();
+    window.v106RefreshBalSet();
+  };
+
+  window.v106SendNotice = function () {
+    if (!isAuthed()) return;
+    var input = document.getElementById('v106-notice');
+    var text = (input && input.value) ? input.value.trim().slice(0, 200) : '';
+    if (!text) {
+      setMsg('v106-cmd-msg', '공지 내용을 입력해 주세요.', false);
+      return;
+    }
+    showBanner(text);
+    var entryId = 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+    finishGrant({ id: entryId, type: 'notice', text: text, ts: Date.now() }, '공지 표시 완료');
+  };
+
+  window.v106RunCommand = function () {
+    if (!isAuthed()) {
+      setMsg('v106-cmd-msg', '제작자 인증이 필요합니다.', false);
+      return;
+    }
+    var input = document.getElementById('v106-cmd-input');
+    var raw = (input && input.value) ? input.value.trim() : '';
+    var parsed = parseCommand(raw);
+    if (parsed.error) {
+      setMsg('v106-cmd-msg', parsed.error, false);
+      return;
+    }
+    var entryId = 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+    if (parsed.type === 'notice') {
+      showBanner(parsed.text);
+      finishGrant({ id: entryId, type: 'notice', text: parsed.text, ts: Date.now() }, '공지 표시 완료');
+      return;
+    }
+    applyLocalGrant(parsed.currency, parsed.amount);
+    toast('🛠 ' + (LABELS[parsed.currency] || '') + ' +' + parsed.amount.toLocaleString());
+    finishGrant(
+      { id: entryId, type: 'grant', currency: parsed.currency, amount: parsed.amount, ts: Date.now() },
+      (LABELS[parsed.currency] || parsed.currency) + ' +' + parsed.amount.toLocaleString() + ' 로컬 지급 완료'
+    );
+  };
+
+  window.v106OpenAuth = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    renderAuthModal();
+    var m = document.getElementById('v106-auth-modal');
+    if (m) m.style.display = 'flex';
+    var input = document.getElementById('v106-auth-input');
+    if (input) { input.value = ''; setTimeout(function () { input.focus(); }, 50); }
+    setMsg('v106-auth-msg', isAuthed() ? '이미 인증되어 있습니다.' : '', isAuthed());
+  };
+  window.v106CloseAuth = function () {
+    var m = document.getElementById('v106-auth-modal');
+    if (m) m.style.display = 'none';
+  };
+  window.v106SubmitAuth = function () {
+    var input = document.getElementById('v106-auth-input');
+    var val = (input && input.value) ? input.value.trim() : '';
+    if (!val) { setMsg('v106-auth-msg', '코드를 입력해 주세요.', false); return; }
+    if (val !== AUTH_CODE) { setMsg('v106-auth-msg', '인증 코드가 올바르지 않습니다.', false); return; }
+    setAuthed(true);
+    setMsg('v106-auth-msg', '인증 성공! 「명령어 쓰기」가 해금되었습니다.', true);
+    injectMenu();
+    toast('🔑 제작자 인증 완료');
+    setTimeout(function () { window.v106CloseAuth(); window.v106OpenCmd(); }, 500);
+  };
+  window.v106RevokeAuth = function () {
+    if (!confirm('제작자 인증을 해제할까요?')) return;
+    setAuthed(false);
+    injectMenu();
+    window.v106CloseAuth();
+    toast('제작자 인증이 해제되었습니다.');
+  };
+
+  window.v106OpenCmd = function () {
+    if (!isAuthed()) { window.v106OpenAuth(); return; }
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    ensureCmdModal();
+    var m = document.getElementById('v106-cmd-modal');
+    if (m) m.style.display = 'flex';
+    var tok = document.getElementById('v106-gh-token');
+    if (tok && !tok.value) tok.value = sg(GH_TOKEN_KEY) || '';
+    window.v106CmdTab('grant');
+    window.v106RefreshBal();
+    setMsg('v106-cmd-msg', '', true);
+  };
+  window.v106CloseCmd = function () {
+    var m = document.getElementById('v106-cmd-modal');
+    if (m) m.style.display = 'none';
+  };
+
+  function injectMenu() {
+    var list = document.querySelector('#main-menu-modal .menu-list');
+    if (!list) return;
+    var authBtn = document.getElementById('v106-auth-menu');
+    if (!authBtn) {
+      authBtn = document.createElement('button');
+      authBtn.type = 'button';
+      authBtn.id = 'v106-auth-menu';
+      authBtn.className = 'menu-item-btn';
+      authBtn.setAttribute('data-search', '제작자 인증 creator auth 관리자');
+      authBtn.textContent = '🔑 제작자 인증';
+      authBtn.onclick = function () { window.v106OpenAuth(); };
+      var secretBtn = Array.from(list.querySelectorAll('.menu-item-btn')).find(function (el) {
+        return (el.textContent || '').indexOf('비밀 코드') >= 0;
+      });
+      if (secretBtn) list.insertBefore(authBtn, secretBtn.nextSibling);
+      else list.appendChild(authBtn);
+    } else {
+      authBtn.onclick = function () { window.v106OpenAuth(); };
+    }
+    var cmdBtn = document.getElementById('v106-cmd-menu');
+    if (isAuthed()) {
+      if (!cmdBtn) {
+        cmdBtn = document.createElement('button');
+        cmdBtn.type = 'button';
+        cmdBtn.id = 'v106-cmd-menu';
+        cmdBtn.className = 'menu-item-btn';
+        cmdBtn.setAttribute('data-search', '명령어 쓰기 치트 공지 전서버 all command 수량');
+        cmdBtn.textContent = '⌨️ 명령어 쓰기';
+        cmdBtn.onclick = function () { window.v106OpenCmd(); };
+        authBtn.parentNode.insertBefore(cmdBtn, authBtn.nextSibling);
+      } else {
+        cmdBtn.style.display = '';
+        cmdBtn.onclick = function () { window.v106OpenCmd(); };
+      }
+    } else if (cmdBtn) {
+      cmdBtn.style.display = 'none';
+    }
+  }
+
+  function boot() {
+    injectMenu();
+    setInterval(injectMenu, 1500);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+
 </body>
 </html>
-
