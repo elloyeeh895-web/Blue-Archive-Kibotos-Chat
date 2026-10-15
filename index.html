@@ -1326,9 +1326,26 @@ window.openV10Hub = function (tab) {
         <button type="button" class="menu-item-btn" onclick="openStampModalFromMenu()" data-search="스탬프 스티커 stamp sticker 이모지">🪧 스탬프</button>
         <button type="button" class="menu-item-btn" onclick="openModalFromMenu('credits')" data-search="크레딧 제작자 credit about">📜 제작 크레딧</button>
         <button type="button" class="menu-item-btn" onclick="openModalFromMenu('bgm')" data-search="bgm 음악 사운드 music volume">🎵 BGM 설정</button>
+        <button type="button" class="menu-item-btn" onclick="openModalFromMenu('creator-notice')" data-search="제작자 공지 공지 notice 안내 오류 고치기">📢 제작자 공지</button>
         <button type="button" class="menu-item-btn" id="menu-voice-btn" onclick="toggleVoiceFromMenu()">🔊 음성 ON</button>
       </div>
       <button type="button" class="main-btn" style="background: #334155;" onclick="closeMenuModal()">닫기</button>
+    </div>
+  </div>
+
+  <!-- 제작자 공지 모달 -->
+  <div class="modal" id="creator-notice-modal">
+    <div class="modal-content">
+      <h3>📢 제작자 공지</h3>
+      <div style="background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+        <h4 style="font-size: 15px; margin-bottom: 10px; color: var(--accent-color);">공지 1</h4>
+        <p style="font-size: 14px; line-height: 1.7; white-space: pre-line; word-break: keep-all;">오류 고치기 추가했습니다
+그럼에도 안됀다면?바깥에 점 3개를 누르고
+사이트 제어를 누른다음
+쿠키 및 사이트 데이터를 누르시고
+저장 데이터를 지우시면 됩니다</p>
+      </div>
+      <button type="button" class="main-btn" style="background: #334155;" onclick="closeCreatorNoticeModal()">닫기</button>
     </div>
   </div>
 
@@ -3263,6 +3280,15 @@ window.openV10Hub = function (tab) {
       else if (type === 'api') openApiKeyModal();
       else if (type === 'credits') openCreditsModal();
       else if (type === 'bgm') openBgmModal();
+      else if (type === 'creator-notice') openCreatorNoticeModal();
+    }
+
+    function openCreatorNoticeModal() {
+      document.getElementById('creator-notice-modal').style.display = 'flex';
+    }
+
+    function closeCreatorNoticeModal() {
+      document.getElementById('creator-notice-modal').style.display = 'none';
     }
 
 
