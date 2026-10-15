@@ -17018,13 +17018,15 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
 
   var VALID = { credits: 1, pyroxene: 1, tickets: 1, gifts: 1, eligma: 1, streak: 1 };
   var known = {};
+  // 최근 이 시간 안의 명령은 앱을 나중에 열어도 적용 (밀리초). 너무 오래된 히스토리는 지급 안 함.
+  var RECENT_MS = 30 * 60 * 1000;
 
   function handleEntry(key, e) {
     if (!e || typeof e !== 'object') return;
     var list = seen();
     if (list.indexOf(key) >= 0) return;                 // 같은 명령 중복 지급 방지
     list.push(key);
-    ss(SEEN_KEY, JSON.stringify(list.slice(-50)));
+    ss(SEEN_KEY, JSON.stringify(list.slice(-80)));
     if (e.type === 'notice' && typeof e.text === 'string' && e.text) {
       noticeQueue.push(e.text.slice(0, 200));
       showNextNotice();
@@ -17035,32 +17037,58 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
 
   var first = true;
 
+  function processEntries(entries) {
+    var now = Date.now();
+    var sorted = entries.slice().sort(function (x, y) { return (x.ts || 0) - (y.ts || 0); });
+    if (first) {
+      first = false;
+      var l = seen();
+      sorted.forEach(function (e) {
+        if (!e || typeof e.id !== 'string') return;
+        var ts = Number(e.ts) || 0;
+        var isRecent = ts > 0 && (now - ts) <= RECENT_MS && (now - ts) >= -60000;
+        if (isRecent && l.indexOf(e.id) < 0) {
+          // 최근 30분 이내 명령: 늦게 접속해도 1회 적용
+          known[e.id] = 1;
+          handleEntry(e.id, e);
+        } else {
+          known[e.id] = 1;
+          if (l.indexOf(e.id) < 0) l.push(e.id);
+        }
+      });
+      ss(SEEN_KEY, JSON.stringify(l.slice(-80)));
+      return;
+    }
+    sorted.forEach(function (e) {
+      if (!e || typeof e.id !== 'string' || known[e.id]) return;
+      known[e.id] = 1;
+      handleEntry(e.id, e);
+    });
+  }
+
   function poll() {
     var delay = POLL_MS;
-    if (typeof document !== 'undefined' && document.hidden) return setTimeout(poll, POLL_MS);   // 화면이 꺼져 있으면 건너뜀
-    fetch(GH_API + '/repos/' + CREATOR_GH_REPO + '/contents/cheat.json', {
-      cache: 'no-cache',                                             // 항상 "바뀌었나요?" 확인 → 안 바뀌면 304
-      headers: { 'Accept': 'application/vnd.github.raw+json' }
-    }).then(function (r) {
-      if (r.status === 404) return '';                               // 아직 cheat.json 이 없음
-      if (r.status === 403 || r.status === 429) { delay = BACKOFF_MS; throw new Error('rate'); }
-      if (!r.ok) throw new Error('http ' + r.status);
+    if (typeof document !== 'undefined' && document.hidden) return setTimeout(poll, POLL_MS);
+    // raw URL 우선 (API 레이트리밋·CORS에 덜 민감), 실패 시 API
+    var rawUrl = 'https://raw.githubusercontent.com/' + CREATOR_GH_REPO + '/main/cheat.json?t=' + Date.now();
+    fetch(rawUrl, { cache: 'no-cache' }).then(function (r) {
+      if (r.status === 404) return '';
+      if (!r.ok) throw new Error('raw ' + r.status);
       return r.text();
+    }).catch(function () {
+      return fetch(GH_API + '/repos/' + CREATOR_GH_REPO + '/contents/cheat.json', {
+        cache: 'no-cache',
+        headers: { 'Accept': 'application/vnd.github.raw+json' }
+      }).then(function (r) {
+        if (r.status === 404) return '';
+        if (r.status === 403 || r.status === 429) { delay = BACKOFF_MS; throw new Error('rate'); }
+        if (!r.ok) throw new Error('http ' + r.status);
+        return r.text();
+      });
     }).then(function (txt) {
       var entries = [];
       if (txt) { try { var d = JSON.parse(txt); if (d && Array.isArray(d.entries)) entries = d.entries; } catch (e) {} }
-      if (first) {                                                   // 접속 직후: 이미 있던 명령은 지급하지 않고 "본 것"으로만 표시
-        first = false;
-        var l = seen();
-        entries.forEach(function (e) { if (e && e.id) { known[e.id] = 1; if (l.indexOf(e.id) < 0) l.push(e.id); } });
-        ss(SEEN_KEY, JSON.stringify(l.slice(-50)));
-        return;
-      }
-      entries.slice().sort(function (x, y) { return (x.ts || 0) - (y.ts || 0); }).forEach(function (e) {
-        if (!e || typeof e.id !== 'string' || known[e.id]) return;
-        known[e.id] = 1;
-        handleEntry(e.id, e);
-      });
+      processEntries(entries);
     }).catch(function () {}).then(function () { setTimeout(poll, delay); });
   }
 
@@ -17568,13 +17596,14 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
       '<input type="text" id="v106-cmd-input" placeholder="《all.청휘석:1000》" onkeydown="if(event.key===\'Enter\')window.v106RunCommand()">' +
       '<button type="button" class="main-btn" style="margin-top:8px" onclick="window.v106RunCommand()">실행</button>' +
       '</div>' +
-      '<label for="v106-gh-token" style="margin-top:12px">GitHub 토큰 (전 서버 배포용)</label>' +
-      '<input type="password" id="v106-gh-token" placeholder="repo / Contents:write PAT (이 기기에만 저장)" autocomplete="off">' +
+      '<label for="v106-gh-token" style="margin-top:12px">GitHub 토큰 (선택 · 없어도 수동 배포 가능)</label>' +
+      '<input type="password" id="v106-gh-token" placeholder="있으면 자동 배포 / 없으면 파일 다운로드 방식" autocomplete="off">' +
       '<div class="v106-row" style="margin-top:8px">' +
-      '<button type="button" class="main-btn" style="background:#0f766e;margin:0" onclick="window.v106TestToken()">토큰 권한 확인</button>' +
-      '<button type="button" class="main-btn" style="background:#7c3aed;margin:0" onclick="window.v106CopyManual(window.__v106LastEntry||{id:\'manual\',type:\'notice\',text:\'(항목 없음)\',ts:Date.now()})">수동 배포 복사</button>' +
+      '<button type="button" class="main-btn" style="background:#0f766e;margin:0" onclick="window.v106TestToken()">토큰 확인</button>' +
+      '<button type="button" class="main-btn" style="background:#7c3aed;margin:0" onclick="window.v106ManualDeploy()">수동 배포</button>' +
+      '<button type="button" class="main-btn" style="background:#0369a1;margin:0" onclick="window.v106VerifyServer()">서버 확인</button>' +
       '</div>' +
-      '<p class="v106-hint" style="text-align:left;margin-top:8px">422가 나면 보통 토큰에 <b>Contents 쓰기</b> 권한이 없는 경우입니다. Classic PAT은 <code>repo</code>, Fine-grained는 해당 저장소 <code>Contents: Read and write</code>가 필요합니다.</p>' +
+      '<p class="v106-hint" style="text-align:left;margin-top:8px">토큰 쓰기 권한이 없거나 422가 나도 <b>수동 배포</b>로 전 서버에 반영할 수 있습니다. (cheat.json 다운로드 → GitHub에 붙여넣기 → Commit)</p>' +
       '<p class="v106-status" id="v106-cmd-msg"></p>' +
       '<button type="button" class="main-btn" style="background:#334155" onclick="window.v106CloseCmd()">닫기</button>' +
       '</div>';
@@ -17616,9 +17645,8 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
           return (e.field ? e.field + ': ' : '') + (e.message || e.code || JSON.stringify(e));
         }).join(' / ');
       }
-      if (j && j.documentation_url) msg += '\n' + j.documentation_url;
     } catch (e) {
-      if (bodyText) msg += ' · ' + String(bodyText).replace(/\s+/g, ' ').slice(0, 220);
+      if (bodyText) msg += ' · ' + String(bodyText).replace(/\s+/g, ' ').slice(0, 200);
     }
     return msg;
   }
@@ -17634,13 +17662,11 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
   }
 
   function decodeGhContent(b64) {
-    var raw = '';
     var clean = String(b64 || '').replace(/\s/g, '');
     try {
       var bin = atob(clean);
-      try { raw = decodeURIComponent(escape(bin)); } catch (e1) { raw = bin; }
-    } catch (e2) { raw = ''; }
-    return raw;
+      try { return decodeURIComponent(escape(bin)); } catch (e1) { return bin; }
+    } catch (e2) { return ''; }
   }
 
   function normalizeCheatData(raw) {
@@ -17654,6 +17680,60 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
     return data;
   }
 
+  /** 공개 URL로 현재 cheat.json 읽기 (토큰 불필요) */
+  function fetchCheatPublic() {
+    var url = 'https://raw.githubusercontent.com/' + CREATOR_GH_REPO + '/main/' + CHEAT_PATH + '?t=' + Date.now();
+    return fetch(url, { cache: 'no-cache' }).then(function (r) {
+      if (r.status === 404) return { entries: [] };
+      if (!r.ok) throw new Error('cheat.json 읽기 실패 (' + r.status + ')');
+      return r.text().then(function (t) { return normalizeCheatData(t); });
+    }).catch(function () {
+      // raw 실패 시 API 공개 조회
+      return fetch('https://api.github.com/repos/' + CREATOR_GH_REPO + '/contents/' + CHEAT_PATH + '?ref=main', {
+        headers: { 'Accept': 'application/vnd.github+json' },
+        cache: 'no-cache'
+      }).then(function (r) {
+        if (r.status === 404) return { entries: [] };
+        if (!r.ok) return { entries: [] };
+        return r.json().then(function (j) {
+          return normalizeCheatData(decodeGhContent(j.content));
+        });
+      }).catch(function () { return { entries: [] }; });
+    });
+  }
+
+  function mergeEntry(data, entry) {
+    var next = { entries: (data.entries || []).slice() };
+    next.entries = next.entries.filter(function (e) { return !e || e.id !== entry.id; });
+    next.entries.push(entry);
+    if (next.entries.length > 80) next.entries = next.entries.slice(-80);
+    return next;
+  }
+
+  function downloadCheatFile(obj) {
+    var body = JSON.stringify(obj, null, 2);
+    var blob = new Blob([body], { type: 'application/json;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'cheat.json';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      try { URL.revokeObjectURL(a.href); } catch (e) {}
+      a.remove();
+    }, 2000);
+    return body;
+  }
+
+  function openGhEdit() {
+    var url = 'https://github.com/' + CREATOR_GH_REPO + '/edit/main/' + CHEAT_PATH;
+    try { window.open(url, '_blank', 'noopener'); } catch (e) {
+      try { location.href = url; } catch (e2) {}
+    }
+  }
+
+  /** 토큰으로 API 쓰기 시도 */
   function pushCheatEntry(entry) {
     var tokenEl = document.getElementById('v106-gh-token');
     var token = (tokenEl && tokenEl.value) || sg(GH_TOKEN_KEY) || '';
@@ -17675,48 +17755,32 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
           });
         }
         return r.json().then(function (j) {
-          return {
-            sha: j.sha || null,
-            data: normalizeCheatData(decodeGhContent(j.content))
-          };
+          return { sha: j.sha || null, data: normalizeCheatData(decodeGhContent(j.content)) };
         });
       });
     }
 
     function doPut(sha, dataObj, attempt) {
-      var next = { entries: (dataObj.entries || []).slice() };
-      // 동일 id 중복 방지
-      next.entries = next.entries.filter(function (e) { return !e || e.id !== entry.id; });
-      next.entries.push(entry);
-      if (next.entries.length > 80) next.entries = next.entries.slice(-80);
-
-      var contentStr = JSON.stringify(next);
+      var next = mergeEntry(dataObj, entry);
       var payload = {
         message: 'chore: creator ' + String(entry.type || 'cmd') + ' ' + String(entry.id || ''),
-        content: b64utf8(contentStr),
+        content: b64utf8(JSON.stringify(next)),
         branch: 'main'
       };
       if (sha) payload.sha = sha;
-
       return fetch(api, {
         method: 'PUT',
         headers: authHeaders(token, true),
         body: JSON.stringify(payload)
       }).then(function (r) {
-        if (r.ok || r.status === 201) return r.json().then(function () { return { pushed: true }; });
+        if (r.ok || r.status === 201) return { pushed: true };
         return r.text().then(function (t) {
-          var detail = parseGhError(r, t);
-          // 충돌/검증 실패 → 최신 sha로 재시도
           if ((r.status === 409 || r.status === 422) && attempt < 3) {
             return readPack().then(function (fresh) {
               return doPut(fresh.sha, fresh.data, attempt + 1);
             });
           }
-          // 권한 힌트
-          if (r.status === 401 || r.status === 403) {
-            throw new Error(detail + '\n→ 토큰에 저장소 Contents 쓰기 권한이 있는지 확인하세요.');
-          }
-          throw new Error(detail);
+          throw new Error(parseGhError(r, t));
         });
       });
     }
@@ -17726,18 +17790,29 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
     });
   }
 
+  /** 토큰 실패/없을 때: 파일 다운로드 + GitHub 편집 페이지 (저장소 주인이면 브라우저 로그인만으로 배포 가능) */
+  function deployManual(entry) {
+    return fetchCheatPublic().then(function (data) {
+      var next = mergeEntry(data, entry);
+      window.__v106LastCheat = next;
+      window.__v106LastEntry = entry;
+      downloadCheatFile(next);
+      openGhEdit();
+      return next;
+    });
+  }
+
   window.v106TestToken = function () {
     var tokenEl = document.getElementById('v106-gh-token');
     var token = (tokenEl && tokenEl.value) || sg(GH_TOKEN_KEY) || '';
     token = String(token).trim();
     if (!token) {
-      setMsg('v106-cmd-msg', '토큰을 먼저 입력하세요.', false);
+      setMsg('v106-cmd-msg', '토큰이 없습니다. 없어도 「수동 배포」로 전 서버 반영이 가능합니다.', false);
       return;
     }
     ss(GH_TOKEN_KEY, token);
     setMsg('v106-cmd-msg', '토큰·저장소 권한 확인 중…', true);
-    var repoApi = 'https://api.github.com/repos/' + CREATOR_GH_REPO;
-    fetch(repoApi, {
+    fetch('https://api.github.com/repos/' + CREATOR_GH_REPO, {
       headers: authHeaders(token, false),
       cache: 'no-cache'
     }).then(function (r) {
@@ -17745,63 +17820,156 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
         if (!r.ok) throw new Error(parseGhError(r, t));
         var j = JSON.parse(t);
         var perms = j.permissions || {};
-        var lines = [];
-        lines.push('저장소: ' + (j.full_name || CREATOR_GH_REPO));
-        lines.push('기본 브랜치: ' + (j.default_branch || '?'));
-        lines.push('push 권한: ' + (perms.push === true ? '있음 ✅' : '없음 또는 확인 불가 ⚠️'));
-        lines.push('admin 권한: ' + (perms.admin === true ? '있음' : '없음'));
-        if (perms.push !== true) {
-          lines.push('');
-          lines.push('※ push가 없으면 쓰기가 거부됩니다.');
-          lines.push('Classic PAT: repo 스코프 필요');
-          lines.push('Fine-grained: Contents Read and write');
-        }
-        setMsg('v106-cmd-msg', lines.join('\n'), perms.push === true);
-        return perms;
+        var ok = perms.push === true;
+        setMsg('v106-cmd-msg',
+          '저장소: ' + (j.full_name || CREATOR_GH_REPO) +
+          '\npush 권한: ' + (ok ? '있음 ✅ → 자동 배포 가능' : '없음 ⚠️ → 수동 배포를 사용하세요') +
+          '\n(Classic PAT: repo / Fine-grained: Contents Read and write)',
+          ok);
       });
     }).catch(function (err) {
-      setMsg('v106-cmd-msg', '토큰 확인 실패: ' + (err && err.message ? err.message : err), false);
+      setMsg('v106-cmd-msg', '토큰 확인 실패: ' + (err && err.message ? err.message : err) +
+        '\n→ 토큰 없이 「수동 배포」를 쓰면 됩니다.', false);
+    });
+  };
+
+  window.v106ManualDeploy = function () {
+    var entry = window.__v106LastEntry;
+    if (!entry) {
+      setMsg('v106-cmd-msg', '먼저 공지 또는 재화 지급을 한 번 실행하세요.', false);
+      return;
+    }
+    setMsg('v106-cmd-msg', 'cheat.json 준비 중…', true);
+    deployManual(entry).then(function () {
+      setMsg('v106-cmd-msg',
+        '✅ cheat.json 다운로드 완료 + GitHub 편집 페이지를 열었습니다.\n\n' +
+        '① 다운로드한 cheat.json 을 메모장으로 열어 전체 복사\n' +
+        '② GitHub 편집 화면에서 기존 내용을 모두 지우고 붙여넣기\n' +
+        '③ Commit changes\n\n' +
+        '약 20초 후 다른 플레이어에게 반영됩니다.',
+        true);
+    }).catch(function (err) {
+      setMsg('v106-cmd-msg', '수동 배포 준비 실패: ' + (err && err.message ? err.message : err), false);
+    });
+  };
+
+  window.v106VerifyServer = function () {
+    setMsg('v106-cmd-msg', '서버 cheat.json 확인 중…', true);
+    var url = 'https://raw.githubusercontent.com/' + CREATOR_GH_REPO + '/main/' + CHEAT_PATH + '?t=' + Date.now();
+    fetch(url, { cache: 'no-cache' }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (d) {
+      var entries = (d && d.entries) ? d.entries : [];
+      var last = entries.length ? entries[entries.length - 1] : null;
+      var lines = ['서버 항목 수: ' + entries.length];
+      if (last) {
+        lines.push('마지막 항목 id: ' + last.id);
+        lines.push('type: ' + last.type);
+        if (last.type === 'notice') lines.push('text: ' + (last.text || ''));
+        if (last.type === 'grant') lines.push((last.currency || '') + ' +' + (last.amount || ''));
+        lines.push('ts: ' + (last.ts || ''));
+      } else {
+        lines.push('항목이 비어 있습니다.');
+      }
+      var mine = window.__v106LastEntry;
+      if (mine && mine.id) {
+        var found = entries.some(function (e) { return e && e.id === mine.id; });
+        lines.push(found
+          ? '✅ 방금 보낸 명령이 서버에 있습니다. 다른 기기는 최대 20초 후 반영됩니다.'
+          : '❌ 방금 보낸 명령이 서버에 없습니다. Commit 이 안 된 상태입니다. 「수동 배포」 후 GitHub에서 Commit 하세요.');
+      }
+      setMsg('v106-cmd-msg', lines.join('\n'), true);
+    }).catch(function (err) {
+      setMsg('v106-cmd-msg', '서버 확인 실패: ' + (err && err.message ? err.message : err), false);
     });
   };
 
   window.v106CopyManual = function (entry) {
-    var payload = { entries: [entry] };
-    var text = JSON.stringify(payload, null, 2);
-    function done(ok) {
+    entry = entry || window.__v106LastEntry;
+    if (!entry) {
+      setMsg('v106-cmd-msg', '복사할 항목이 없습니다. 먼저 명령을 실행하세요.', false);
+      return;
+    }
+    var line = JSON.stringify(entry);
+    function show() {
       setMsg('v106-cmd-msg',
-        (ok ? '📋 항목을 복사했습니다.\n' : '') +
-        'GitHub에서 cheat.json 을 연 뒤 entries 배열 끝에 붙여넣으세요.\n' +
-        '파일: https://github.com/' + CREATOR_GH_REPO + '/edit/main/cheat.json\n' +
-        '예시 항목:\n' + JSON.stringify(entry),
+        '항목 JSON:\n' + line +
+        '\n\nGitHub cheat.json 의 entries 배열 끝에 쉼표 후 붙여넣으세요.\n' +
+        'https://github.com/' + CREATOR_GH_REPO + '/edit/main/cheat.json',
         true);
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(JSON.stringify(entry)).then(function () { done(true); }).catch(function () { done(false); });
-    } else {
-      done(false);
-    }
-  }
+      navigator.clipboard.writeText(line).then(function () {
+        setMsg('v106-cmd-msg', '📋 항목을 클립보드에 복사했습니다.\n' + line, true);
+      }).catch(show);
+    } else show();
+  };
 
   function finishGrant(entry, localLabel) {
     markSeen(entry.id);
-    setMsg('v106-cmd-msg', localLabel + '\n전 서버 배포 중…', true);
     window.__v106LastEntry = entry;
+    setMsg('v106-cmd-msg', localLabel + '\n전 서버 배포 시도 중…', true);
+
+    var tokenEl = document.getElementById('v106-gh-token');
+    var token = (tokenEl && tokenEl.value) || sg(GH_TOKEN_KEY) || '';
+    token = String(token).trim();
+
+    function afterApiFail(errMsg) {
+      // 자동으로 수동 배포 패키지 준비
+      setMsg('v106-cmd-msg', localLabel + '\n자동 배포 실패 → 수동 배포 파일 준비 중…\n' + (errMsg || ''), false);
+      return deployManual(entry).then(function () {
+        setMsg('v106-cmd-msg',
+          localLabel +
+          '\n⚠️ API 자동 배포는 실패했지만, 수동 배포 준비를 마쳤습니다.\n\n' +
+          '① 방금 받은 cheat.json 전체 복사\n' +
+          '② 열린 GitHub 편집 페이지에 붙여넣기\n' +
+          '③ Commit changes\n\n' +
+          (errMsg ? '실패 사유: ' + errMsg : ''),
+          true);
+      }).catch(function (e2) {
+        setMsg('v106-cmd-msg',
+          localLabel +
+          '\n자동·수동 준비 모두 실패: ' + (e2 && e2.message ? e2.message : e2) +
+          (errMsg ? '\nAPI: ' + errMsg : '') +
+          '\n「수동 배포」버튼을 다시 눌러보세요.',
+          false);
+      });
+    }
+
+    if (!token) {
+      // 토큰 없음 → 바로 수동 배포 경로 (저장소 주인이면 이게 가장 확실)
+      deployManual(entry).then(function () {
+        setMsg('v106-cmd-msg',
+          localLabel +
+          '\n✅ 수동 배포 준비 완료 (토큰 없이 가능)\n\n' +
+          '① 다운로드된 cheat.json 전체 복사\n' +
+          '② GitHub 편집 페이지에 붙여넣기\n' +
+          '③ Commit changes → 전 서버 반영',
+          true);
+        window.v106RefreshBal();
+        window.v106RefreshBalSet();
+      }).catch(function (err) {
+        setMsg('v106-cmd-msg', localLabel + '\n배포 준비 실패: ' + (err && err.message ? err.message : err), false);
+        window.v106RefreshBal();
+        window.v106RefreshBalSet();
+      });
+      return;
+    }
+
     pushCheatEntry(entry).then(function (res) {
       if (res && res.pushed) {
-        setMsg('v106-cmd-msg', localLabel + '\n✅ 전 서버(cheat.json) 배포 완료', true);
+        setMsg('v106-cmd-msg', localLabel + '\n✅ 전 서버(cheat.json) 자동 배포 완료', true);
       } else {
-        setMsg('v106-cmd-msg', localLabel + '\n✅ 로컬 적용 완료 (토큰 없음 → 전 서버 배포 생략)\n아래 「토큰 권한 확인」 또는 수동 배포를 사용하세요.', true);
+        return afterApiFail('토큰 없음');
       }
       window.v106RefreshBal();
       window.v106RefreshBalSet();
     }).catch(function (err) {
-      var detail = (err && err.message) ? err.message : String(err);
-      setMsg('v106-cmd-msg',
-        localLabel + '\n전 서버 배포 실패:\n' + detail +
-        '\n\n→ 「토큰 권한 확인」을 눌러 보거나, 「수동 배포 복사」로 cheat.json에 직접 붙여넣으세요.',
-        false);
-      window.v106RefreshBal();
-      window.v106RefreshBalSet();
+      afterApiFail(err && err.message ? err.message : String(err)).then(function () {
+        window.v106RefreshBal();
+        window.v106RefreshBalSet();
+      });
     });
   }
 
