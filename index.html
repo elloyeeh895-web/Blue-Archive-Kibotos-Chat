@@ -17087,12 +17087,19 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
     sorted.forEach(function (e) {
       if (!e || typeof e.id !== 'string' || !e.id) return;
       if (map[e.id] || sessionDone[e.id]) return;
-      sessionDone[e.id] = 1;
-      map[e.id] = 1;
-      seen.push(e.id);
+      // 적용에 성공한 명령만 수신 완료로 기록합니다.
+      // 이전에는 적용 전에 seen/sessionDone에 기록해서, 초기화 시점에
+      // 경제 함수가 아직 준비되지 않았거나 예외가 나면 영구적으로 누락됐습니다.
       try {
-        if (applyEntry(e)) applied++;
-      } catch (err) {}
+        if (applyEntry(e)) {
+          applied++;
+          sessionDone[e.id] = 1;
+          map[e.id] = 1;
+          seen.push(e.id);
+        }
+      } catch (err) {
+        // 다음 폴링에서 같은 명령을 재시도합니다.
+      }
     });
     saveSeen(seen);
     return applied;
