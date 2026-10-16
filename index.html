@@ -17,7 +17,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="키보토스">
-  <link rel="manifest" href="data:application/manifest+json;charset=utf-8,{"name":"키보토스 대화 OS","short_name":"키보토스","description":"블루 아카이브 키보토스 대화 OS","start_url":"./","display":"standalone","background_color":"#0b0e14","theme_color":"#8a2be2","orientation":"portrait","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%238a2be2' width='100' height='100' rx='20'/%3E%3Ctext x='50' y='62' font-size='48' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3EP%3C/text%3E%3C/svg%3E","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}">
+  <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%238a2be2' width='100' height='100' rx='20'/%3E%3Ctext x='50' y='62' font-size='48' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3EP%3C/text%3E%3C/svg%3E">
 
   <!-- Spck Editor 호환: 외부 라이브러리 없이 단일 HTML로 실행됩니다.
@@ -15602,33 +15602,14 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
 </script>
 
 
-<script>
-/* PWA Service Worker - 단일 HTML 오프라인 캐시 */
-(function(){
+<script id="kivotos-pwa-service-worker-registration">
+/* PWA: GitHub Pages에서는 같은 사이트의 파일로 Service Worker를 등록해야 합니다. */
+(function () {
   if (!('serviceWorker' in navigator)) return;
-  var SW_CODE = `
-    const CACHE = 'kivotos-v10.1.0';
-    self.addEventListener('install', e => {
-      e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./'])).then(() => self.skipWaiting()));
-    });
-    self.addEventListener('activate', e => {
-      e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
-    });
-    self.addEventListener('fetch', e => {
-      e.respondWith(
-        caches.match(e.request).then(r => r || fetch(e.request).then(res => {
-          if (e.request.method === 'GET' && res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE).then(c => c.put(e.request, clone));
-          }
-          return res;
-        }).catch(() => caches.match('./')))
-      );
-    });
-  `;
-  var blob = new Blob([SW_CODE], {type: 'application/javascript'});
-  var url = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(url).catch(function(){});
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+      .catch(function (error) { console.warn('[Kivotos PWA] Service Worker 등록 실패:', error); });
+  });
 })();
 </script>
 
@@ -20175,6 +20156,85 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
   setTimeout(bindChatScroll, 1500);
 
   console.log('[PRANA] v10.9 runtime helpers ready');
+})();
+</script>
+
+
+
+<!-- 키보토스 대화 OS PWA 설치 버튼: 기존 앱 데이터/기능과 별도로 동작 -->
+<style id="kivotos-pwa-install-style">
+  #kivotos-pwa-install-button {
+    position: fixed; right: 12px; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); z-index: 2147483000;
+    border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 11px 15px;
+    color: #fff; background: linear-gradient(135deg, #8a2be2, #5d45d6);
+    box-shadow: 0 4px 18px rgba(0,0,0,.28); font: 700 13px/1.2 system-ui, sans-serif;
+    letter-spacing: .1px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  #kivotos-pwa-install-button[hidden] { display: none !important; }
+  #kivotos-pwa-help { position: fixed; inset: 0; z-index: 2147483001; display: none; align-items: center; justify-content: center; padding: 18px; background: rgba(0,0,0,.68); box-sizing: border-box; }
+  #kivotos-pwa-help.open { display: flex; }
+  #kivotos-pwa-help-card { width: min(100%, 420px); max-height: 85dvh; overflow: auto; box-sizing: border-box; padding: 20px; border-radius: 18px; color: #f7f4ff; background: #171523; border: 1px solid rgba(173,139,255,.5); box-shadow: 0 12px 44px rgba(0,0,0,.4); font: 14px/1.65 system-ui, sans-serif; }
+  #kivotos-pwa-help-card h2 { margin: 0 0 10px; font-size: 19px; }
+  #kivotos-pwa-help-card ol { padding-left: 22px; }
+  #kivotos-pwa-help-card li { margin: 7px 0; }
+  #kivotos-pwa-help-card button { border: 0; border-radius: 10px; padding: 10px 14px; color: white; background: #7547d9; font-weight: 700; min-height: 40px; }
+  #kivotos-pwa-help-card .kivotos-pwa-note { color: #c9c1df; font-size: 12px; }
+  @media (display-mode: standalone) { #kivotos-pwa-install-button { display: none !important; } }
+</style>
+<button id="kivotos-pwa-install-button" type="button" aria-label="키보토스 대화 OS 앱 설치">앱 설치</button>
+<div id="kivotos-pwa-help" role="dialog" aria-modal="true" aria-labelledby="kivotos-pwa-help-title">
+  <div id="kivotos-pwa-help-card">
+    <h2 id="kivotos-pwa-help-title">키보토스 대화 OS 설치</h2>
+    <p id="kivotos-pwa-help-intro">이 브라우저에서는 사이트 내부 설치 창을 바로 열 수 없어요. 아래 방법으로 설치해 주세요.</p>
+    <ol>
+      <li><b>Chrome</b> 또는 <b>삼성 인터넷</b>에서 이 사이트를 열어요.</li>
+      <li>브라우저 오른쪽 위의 <b>⋮ 메뉴</b>를 눌러요.</li>
+      <li><b>앱 설치</b> 또는 <b>현재 페이지 추가 → 홈 화면</b>을 선택해요. 표시되는 메뉴 이름은 브라우저에 따라 달라질 수 있어요.</li>
+      <li>확인 창이 나오면 <b>설치</b> 또는 <b>추가</b>를 눌러요.</li>
+    </ol>
+    <p class="kivotos-pwa-note">설치 메뉴가 안 보이면 사이트를 HTTPS 주소로 열었는지 확인하고, 페이지를 새로고침한 뒤 다시 시도해 주세요. 설치 가능 여부는 브라우저가 결정해요.</p>
+    <button id="kivotos-pwa-help-close" type="button">닫기</button>
+  </div>
+</div>
+<script id="kivotos-pwa-install-logic">
+(function () {
+  'use strict';
+  var deferredPrompt = null;
+  var button = document.getElementById('kivotos-pwa-install-button');
+  var help = document.getElementById('kivotos-pwa-help');
+  var close = document.getElementById('kivotos-pwa-help-close');
+  if (!button || !help || !close) return;
+  function isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }
+  function openHelp() { help.classList.add('open'); }
+  function closeHelp() { help.classList.remove('open'); }
+  if (isStandalone()) button.hidden = true;
+  window.addEventListener('beforeinstallprompt', function (event) {
+    event.preventDefault();
+    deferredPrompt = event;
+    if (!isStandalone()) button.hidden = false;
+  });
+  window.addEventListener('appinstalled', function () {
+    deferredPrompt = null; button.hidden = true; closeHelp();
+  });
+  button.addEventListener('click', async function () {
+    if (isStandalone()) { button.hidden = true; return; }
+    if (deferredPrompt && typeof deferredPrompt.prompt === 'function') {
+      try {
+        var promptEvent = deferredPrompt;
+        deferredPrompt = null;
+        await promptEvent.prompt();
+        if (promptEvent.userChoice) await promptEvent.userChoice;
+      } catch (error) {
+        console.warn('[Kivotos PWA] 설치 프롬프트를 열지 못했습니다:', error);
+        openHelp();
+      }
+    } else { openHelp(); }
+  });
+  close.addEventListener('click', closeHelp);
+  help.addEventListener('click', function (event) { if (event.target === help) closeHelp(); });
+  document.addEventListener('keydown', function (event) { if (event.key === 'Escape') closeHelp(); });
 })();
 </script>
 
