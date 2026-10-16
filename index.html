@@ -15602,6 +15602,35 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
 </script>
 
 
+<script>
+/* PWA Service Worker - 단일 HTML 오프라인 캐시 */
+(function(){
+  if (!('serviceWorker' in navigator)) return;
+  var SW_CODE = `
+    const CACHE = 'kivotos-v10.1.0';
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./'])).then(() => self.skipWaiting()));
+    });
+    self.addEventListener('activate', e => {
+      e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+    });
+    self.addEventListener('fetch', e => {
+      e.respondWith(
+        caches.match(e.request).then(r => r || fetch(e.request).then(res => {
+          if (e.request.method === 'GET' && res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone));
+          }
+          return res;
+        }).catch(() => caches.match('./')))
+      );
+    });
+  `;
+  var blob = new Blob([SW_CODE], {type: 'application/javascript'});
+  var url = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(url).catch(function(){});
+})();
+</script>
 
 
 <script id="v102-season-pass-cosmetics">
