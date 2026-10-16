@@ -19534,6 +19534,10 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
       '#v108-yt-player-wrap iframe{width:100%;height:158px;border:0;display:block;background:#000}',
       '#v108-yt-player-wrap .v108-yt-actions{display:flex;gap:4px}',
       '#v108-yt-player-wrap .v108-yt-actions button{border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer}',
+      '#v108-yt-player-wrap.v108-hidden{opacity:0;pointer-events:none;width:1px;height:1px;right:-9999px;bottom:-9999px;overflow:hidden}',
+      '#v108-yt-restore{display:none;position:fixed;right:max(10px,env(safe-area-inset-right));bottom:max(78px,calc(env(safe-area-inset-bottom)+70px));z-index:51;padding:8px 12px;border-radius:999px;border:1px solid var(--accent-color);background:var(--card-bg);color:var(--accent-color);font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.35);align-items:center;gap:6px}',
+      '#v108-yt-restore.show{display:flex}',
+      '#v108-yt-player-wrap.v108-collapsed #v108-yt-frame-slot{display:none}',
       '.v108-badge{display:inline-block;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:700;margin-left:4px;border:1px solid var(--accent-color);color:var(--accent-color)}',
       '.v108-badge.yt{border-color:#f87171;color:#f87171}',
       '.v108-badge.au{border-color:#34d399;color:#34d399}'
@@ -19542,18 +19546,29 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
   }
 
   function ensureYtPlayer() {
-    if (document.getElementById('v108-yt-player-wrap')) return;
-    var wrap = document.createElement('div');
-    wrap.id = 'v108-yt-player-wrap';
-    wrap.innerHTML =
-      '<div class="v108-yt-bar">' +
-      '<span id="v108-yt-title">YouTube OST</span>' +
-      '<div class="v108-yt-actions">' +
-      '<button type="button" onclick="window.v108MinimizeYt()" title="최소화">—</button>' +
-      '<button type="button" onclick="window.v108StopCustomOst()" title="중지">✕</button>' +
-      '</div></div>' +
-      '<div id="v108-yt-frame-slot"></div>';
-    document.body.appendChild(wrap);
+    if (!document.getElementById('v108-yt-player-wrap')) {
+      var wrap = document.createElement('div');
+      wrap.id = 'v108-yt-player-wrap';
+      wrap.innerHTML =
+        '<div class="v108-yt-bar">' +
+        '<span id="v108-yt-title">YouTube OST</span>' +
+        '<div class="v108-yt-actions">' +
+        '<button type="button" onclick="window.v108MinimizeYt()" title="영상 접기">—</button>' +
+        '<button type="button" onclick="window.v108HideYt()" title="창 숨기기 (재생 유지)">👁</button>' +
+        '<button type="button" onclick="window.v108StopCustomOst()" title="중지">✕</button>' +
+        '</div></div>' +
+        '<div id="v108-yt-frame-slot"></div>';
+      document.body.appendChild(wrap);
+    }
+    if (!document.getElementById('v108-yt-restore')) {
+      var chip = document.createElement('button');
+      chip.type = 'button';
+      chip.id = 'v108-yt-restore';
+      chip.setAttribute('aria-label', 'OST 창 다시 보이기');
+      chip.innerHTML = '🎵 OST 창 보이기';
+      chip.onclick = function () { window.v108ShowYt(); };
+      document.body.appendChild(chip);
+    }
   }
 
   function pauseNativeBgm() {
@@ -19570,9 +19585,13 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
     var wrap = document.getElementById('v108-yt-player-wrap');
     if (wrap) {
       wrap.classList.remove('show');
+      wrap.classList.remove('v108-hidden');
+      wrap.classList.remove('v108-collapsed');
       var slot = document.getElementById('v108-yt-frame-slot');
-      if (slot) slot.innerHTML = '';
+      if (slot) { slot.innerHTML = ''; slot.style.display = ''; }
     }
+    var chip = document.getElementById('v108-yt-restore');
+    if (chip) chip.classList.remove('show');
   }
 
   function playYoutube(track) {
@@ -19649,12 +19668,30 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
   window.v108MinimizeYt = function () {
     var wrap = document.getElementById('v108-yt-player-wrap');
     if (!wrap) return;
-    var slot = document.getElementById('v108-yt-frame-slot');
-    if (slot && slot.style.display === 'none') {
-      slot.style.display = 'block';
-    } else if (slot) {
-      slot.style.display = 'none';
+    wrap.classList.toggle('v108-collapsed');
+  };
+
+  window.v108HideYt = function () {
+    ensureYtPlayer();
+    var wrap = document.getElementById('v108-yt-player-wrap');
+    var chip = document.getElementById('v108-yt-restore');
+    if (wrap) wrap.classList.add('v108-hidden');
+    if (chip) {
+      var title = document.getElementById('v108-yt-title');
+      var name = title ? title.textContent.replace(/^▶\s*/, '') : 'OST';
+      chip.innerHTML = '🎵 ' + name + ' · 창 보이기';
+      chip.classList.add('show');
     }
+  };
+
+  window.v108ShowYt = function () {
+    var wrap = document.getElementById('v108-yt-player-wrap');
+    var chip = document.getElementById('v108-yt-restore');
+    if (wrap) {
+      wrap.classList.remove('v108-hidden');
+      wrap.classList.add('show');
+    }
+    if (chip) chip.classList.remove('show');
   };
 
   window.v108DeleteTrack = function (id) {
