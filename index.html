@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="application-version" content="10.4.0">
+  <meta name="application-version" content="10.7.0">
   <meta name="application-schema" content="3">
-  <title>키보토스 대화 OS v10.4.0 · AI 대화 강화 · 단톡방 2.0</title>
+  <title>키보토스 대화 OS v10.7.0 · 싯딤요약 · 다중프로필 · 거래소 · 단톡시뮬</title>
   <meta name="theme-color" content="#8a2be2">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18567,6 +18567,1320 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
   function boot() {
     injectMenu();
     setInterval(injectMenu, 1500);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+
+
+<script id="v107-summary-profile-exchange-sim">
+/* v10.7: 싯딤 요약 · 다중 프로필 · 로컬 거래소 · 단톡 동시접속 시뮬레이션 */
+(function () {
+  'use strict';
+
+  var PROFILE_META_KEY = 'PRANA_V107_PROFILES';
+  var PROFILE_ACTIVE_KEY = 'PRANA_V107_ACTIVE_PROFILE';
+  var PROFILE_SLOT_PREFIX = 'PRANA_V107_SLOT_';
+  var SIM_KEY = 'PRANA_V107_SIM_ONLINE';
+  var SUMMARY_UNLOCK_KEY = 'PRANA_V107_SUMMARY_SIDDIM'; // norona/sirena 요약 해금 (Multiverse와 연동)
+
+  function sg(k) {
+    try {
+      if (typeof safeGet === 'function') return safeGet(k) || '';
+      return localStorage.getItem(k) || '';
+    } catch (e) { return ''; }
+  }
+  function ss(k, v) {
+    try {
+      if (typeof safeSet === 'function') safeSet(k, v);
+      else localStorage.setItem(k, String(v));
+    } catch (e) {}
+  }
+
+  function ensureStyle() {
+    if (document.getElementById('v107-style')) return;
+    var s = document.createElement('style');
+    s.id = 'v107-style';
+    s.textContent = [
+      '#v107-summary-modal .modal-content,#v107-profile-modal .modal-content,#v107-exchange-modal .modal-content{max-width:420px}',
+      '.v107-hint{font-size:12px;color:#8a9bb0;line-height:1.55;margin-bottom:10px;text-align:center}',
+      '.v107-status{font-size:12px;text-align:center;min-height:18px;margin:8px 0;color:var(--accent-color);font-weight:700;white-space:pre-line}',
+      '.v107-bal{font-size:12px;color:var(--accent-color);font-weight:700;margin:4px 0 8px;line-height:1.5}',
+      '.v107-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}',
+      '.v107-row .main-btn{flex:1;margin:0;min-width:100px}',
+      'select.v107-select,input.v107-input{width:100%;padding:10px;background:var(--bg-color);border:1px solid var(--border-color);color:var(--text-color);border-radius:6px;margin-bottom:10px;font-size:14px}',
+      '.v107-card{padding:10px 12px;border:1px solid var(--border-color);border-radius:10px;background:var(--bg-color);margin-bottom:8px}',
+      '.v107-card.active{border-color:var(--accent-color);background:color-mix(in srgb,var(--accent-color) 12%,transparent)}',
+      '.v107-card h4{font-size:14px;margin:0 0 4px}',
+      '.v107-card .meta{font-size:11px;color:#8a9bb0}',
+      '.v107-sim-row{display:flex;flex-direction:column;gap:6px;align-self:flex-start;max-width:85%}',
+      '.v107-sim-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--bot-bubble);border:1px solid var(--border-color);font-size:12px;color:var(--bot-text);opacity:.92}',
+      '.v107-sim-chip .dots span{display:inline-block;width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.45;margin-left:2px;animation:typing-bounce 1.1s infinite ease-in-out}',
+      '.v107-sim-chip .dots span:nth-child(2){animation-delay:.15s}',
+      '.v107-sim-chip .dots span:nth-child(3){animation-delay:.3s}',
+      '.v107-summary-box{background:var(--bg-color);border:1px solid var(--border-color);border-radius:10px;padding:12px;font-size:13px;line-height:1.6;white-space:pre-wrap;max-height:40vh;overflow-y:auto;margin:8px 0 12px;color:var(--text-color)}',
+      '.v107-who{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}',
+      '.v107-who button{padding:7px 11px;border-radius:999px;border:1px solid var(--border-color);background:var(--bg-color);color:var(--text-color);font-size:12px;font-weight:700;cursor:pointer}',
+      '.v107-who button.on{border-color:var(--accent-color);background:var(--accent-color);color:#fff}'
+    ].join('');
+    document.head.appendChild(s);
+  }
+
+  /* ========== 싯딤 요약 (아로나/프라나 + 해금 시 노로나/시레나) ========== */
+  function isSummaryAgentUnlocked(id) {
+    if (id === 'arona' || id === 'prana') return true;
+    if (id === 'norona' || id === 'sirena') {
+      // Multiverse 비밀코드로 캐릭터 해금되면 요약도 사용 가능
+      try {
+        if (typeof window.isStudentOwned === 'function' && window.isStudentOwned(id)) return true;
+      } catch (e) {}
+      return sg(SUMMARY_UNLOCK_KEY) === '1';
+    }
+    return false;
+  }
+
+  function syncSummaryUnlockFromOwned() {
+    try {
+      if (typeof window.isStudentOwned === 'function') {
+        if (window.isStudentOwned('norona') || window.isStudentOwned('sirena')) {
+          ss(SUMMARY_UNLOCK_KEY, '1');
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Multiverse 입력 시 요약 해금 플래그도 켜기 (submitSecretCode 후킹)
+  function hookSecretForSummary() {
+    if (window.submitSecretCode && !window.submitSecretCode.__v107) {
+      var orig = window.submitSecretCode;
+      window.submitSecretCode = function () {
+        var input = document.getElementById('secret-code-input');
+        var val = (input && input.value) ? input.value.trim() : '';
+        orig.apply(this, arguments);
+        if (val === 'Multiverse') {
+          ss(SUMMARY_UNLOCK_KEY, '1');
+        }
+        syncSummaryUnlockFromOwned();
+      };
+      window.submitSecretCode.__v107 = true;
+    }
+  }
+
+  function collectChatTranscript(maxLines) {
+    maxLines = maxLines || 80;
+    var lines = [];
+    try {
+      var hist = null;
+      try { if (typeof conversationHistory !== 'undefined' && Array.isArray(conversationHistory)) hist = conversationHistory; } catch (eH) {}
+      if (!hist && window.__v107HistRef && Array.isArray(window.__v107HistRef)) hist = window.__v107HistRef;
+      if (hist) hist.forEach(function (h) {
+          if (!h || !h.parts || !h.parts[0]) return;
+          var t = String(h.parts[0].text || '').trim();
+          if (!t) return;
+          var role = h.role === 'user' ? '선생님' : '학생';
+          lines.push('[' + role + '] ' + t);
+        });
+    } catch (e) {}
+    if (!lines.length) {
+      var nodes = document.querySelectorAll('#chat-container .message-row');
+      nodes.forEach(function (row) {
+        var nameEl = row.querySelector('.sender-name');
+        var textEl = row.querySelector('.message-text');
+        var name = nameEl ? nameEl.textContent.replace(/\s+/g, ' ').trim() : '';
+        var text = textEl ? textEl.textContent.trim() : '';
+        if (!text) return;
+        lines.push((name ? '[' + name + '] ' : '') + text);
+      });
+    }
+    if (lines.length > maxLines) lines = lines.slice(-maxLines);
+    return lines.join('\n');
+  }
+
+  function localSummarize(transcript, agentId) {
+    var lines = transcript.split('\n').filter(Boolean);
+    var topics = [];
+    var speakers = {};
+    lines.forEach(function (line) {
+      var m = line.match(/^\[([^\]]+)\]\s*(.*)$/);
+      var who = m ? m[1] : '?';
+      var body = m ? m[2] : line;
+      speakers[who] = (speakers[who] || 0) + 1;
+      if (body.length > 8) topics.push(body.slice(0, 60));
+    });
+    var topSpeakers = Object.keys(speakers).sort(function (a, b) { return speakers[b] - speakers[a]; }).slice(0, 5);
+    var sample = topics.slice(-5);
+    var body =
+      '· 메시지 수: 약 ' + lines.length + '줄\n' +
+      '· 주요 화자: ' + (topSpeakers.join(', ') || '없음') + '\n' +
+      '· 최근 흐름:\n' + (sample.map(function (t) { return '  - ' + t; }).join('\n') || '  (내용 부족)');
+
+    if (agentId === 'arona') {
+      return '빠밤-! 선생님이 나눈 단톡을 아로나가 정리해 봤어요!\n\n' + body + '\n\n이 정도면 핵심은 잡힌 것 같아요. 더 자세히 보고 싶은 부분이 있으면 말씀해 주세요!';
+    }
+    if (agentId === 'norona') {
+      return '빠밤~! 다른 세계 신호까지 훑어 봤는데, 이 단톡 흐름은 대충 이래요!\n\n' + body + '\n\n헤헤, 요약은 여기까지! 더 놀고 싶으면 불러 주세요~';
+    }
+    if (agentId === 'sirena') {
+      return '…단톡 로그 요약입니다.\n\n' + body + '\n\n관측 종료. 추가 분석이 필요하면 지시해 주세요.';
+    }
+    // prana default
+    return '단톡 내용을 요약했습니다.\n\n' + body + '\n\n필요하시면 특정 구간을 지정해 다시 정리해 드리겠습니다.';
+  }
+
+  async function aiSummarize(transcript, agentId) {
+    var key = '';
+    try {
+      key = (typeof apiKey !== 'undefined' && apiKey) ? apiKey : (sg('PRANA_GEMINI_API_KEY') || '');
+    } catch (e) {
+      key = sg('PRANA_GEMINI_API_KEY') || '';
+    }
+    if (!key) return localSummarize(transcript, agentId);
+
+    var personaHint = {
+      arona: '당신은 블루 아카이브의 아로나입니다. 밝고 귀엽게, "빠밤-!" 등을 쓰며 2~6문장으로 단톡 요약을 한국어로 하세요.',
+      prana: '당신은 블루 아카이브의 프라나입니다. 차분하고 정중하게 단톡 핵심을 3~6문장으로 한국어 요약하세요.',
+      norona: '당신은 싯딤의 AI 노로나입니다. 장난스럽고 활기차게 "빠밤~!"을 쓰며 단톡 요약을 한국어로 하세요.',
+      sirena: '당신은 싯딤의 AI 시레나입니다. 간결하고 분석적으로 단톡 요약을 한국어로 하세요.'
+    }[agentId] || '단톡 대화를 한국어로 간결히 요약하세요.';
+
+    var prompt = personaHint + '\n\n[단톡 로그]\n' + transcript.slice(0, 12000) + '\n\n위 대화를 스포일러·메타 설명 없이 핵심만 요약하세요.';
+
+    var models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite'];
+    for (var i = 0; i < models.length; i++) {
+      try {
+        var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + models[i] + ':generateContent?key=' + encodeURIComponent(key);
+        var res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.6, maxOutputTokens: 512 }
+          })
+        });
+        if (!res.ok) continue;
+        var data = await res.json();
+        var parts = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
+        if (Array.isArray(parts)) {
+          var text = parts.map(function (p) { return p && p.text ? p.text : ''; }).join('\n').trim();
+          if (text) return text;
+        }
+      } catch (e) {}
+    }
+    return localSummarize(transcript, agentId);
+  }
+
+  function ensureSummaryModal() {
+    if (document.getElementById('v107-summary-modal')) return;
+    ensureStyle();
+    var m = document.createElement('div');
+    m.className = 'modal';
+    m.id = 'v107-summary-modal';
+    m.innerHTML =
+      '<div class="modal-content">' +
+      '<h3>📋 싯딤 요약</h3>' +
+      '<p class="v107-hint">긴 단톡·대화를 싯딤 OS/AI가 요약합니다.<br>노로나·시레나는 비밀 코드 <b>Multiverse</b>로 해금 후 사용 가능합니다.</p>' +
+      '<div class="v107-who" id="v107-summary-who"></div>' +
+      '<div class="v107-summary-box" id="v107-summary-result">요약을 실행하면 여기에 표시됩니다.</div>' +
+      '<p class="v107-status" id="v107-summary-msg"></p>' +
+      '<div class="v107-row">' +
+      '<button type="button" class="main-btn" onclick="window.v107RunSummary()">요약 실행</button>' +
+      '<button type="button" class="main-btn" style="background:#334155" onclick="window.v107CloseSummary()">닫기</button>' +
+      '</div></div>';
+    document.body.appendChild(m);
+    m.addEventListener('click', function (ev) { if (ev.target === m) window.v107CloseSummary(); });
+  }
+
+  var _summaryAgent = 'prana';
+
+  window.v107OpenSummary = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    syncSummaryUnlockFromOwned();
+    ensureSummaryModal();
+    var who = document.getElementById('v107-summary-who');
+    var agents = [
+      { id: 'prana', label: '프라나' },
+      { id: 'arona', label: '아로나' },
+      { id: 'norona', label: '노로나' },
+      { id: 'sirena', label: '시레나' }
+    ];
+    who.innerHTML = '';
+    agents.forEach(function (a) {
+      var locked = !isSummaryAgentUnlocked(a.id);
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = locked ? ('🔒 ' + a.label) : a.label;
+      b.disabled = locked;
+      if (a.id === _summaryAgent && !locked) b.classList.add('on');
+      b.onclick = function () {
+        if (locked) return;
+        _summaryAgent = a.id;
+        Array.prototype.forEach.call(who.querySelectorAll('button'), function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+      };
+      who.appendChild(b);
+    });
+    if (!isSummaryAgentUnlocked(_summaryAgent)) {
+      _summaryAgent = 'prana';
+    }
+    document.getElementById('v107-summary-result').textContent = '요약을 실행하면 여기에 표시됩니다.';
+    document.getElementById('v107-summary-msg').textContent = '';
+    document.getElementById('v107-summary-modal').style.display = 'flex';
+  };
+  window.v107CloseSummary = function () {
+    var m = document.getElementById('v107-summary-modal');
+    if (m) m.style.display = 'none';
+  };
+  window.v107RunSummary = async function () {
+    var msg = document.getElementById('v107-summary-msg');
+    var box = document.getElementById('v107-summary-result');
+    if (!isSummaryAgentUnlocked(_summaryAgent)) {
+      if (msg) msg.textContent = '이 요약 담당은 아직 해금되지 않았습니다.';
+      return;
+    }
+    var transcript = collectChatTranscript(100);
+    if (!transcript || transcript.length < 20) {
+      if (msg) msg.textContent = '요약할 대화가 너무 짧습니다.';
+      return;
+    }
+    if (msg) msg.textContent = '요약 중…';
+    if (box) box.textContent = '분석 중…';
+    try {
+      var result = await aiSummarize(transcript, _summaryAgent);
+      if (box) box.textContent = result;
+      if (msg) msg.textContent = '완료';
+      // 채팅에도 한 줄 남기기 (선택)
+      try {
+        if (typeof appendMessage === 'function') {
+          var names = { prana: '프라나', arona: '아로나', norona: '노로나', sirena: '시레나' };
+          appendMessage(names[_summaryAgent] || '싯딤', result, true, names[_summaryAgent] || '싯딤', null, { hideActions: true });
+          if (typeof saveConversation === 'function') saveConversation();
+        }
+      } catch (e2) {}
+    } catch (err) {
+      if (box) box.textContent = localSummarize(transcript, _summaryAgent);
+      if (msg) msg.textContent = 'AI 요약 실패 → 로컬 요약으로 대체';
+    }
+  };
+
+  /* ========== 다중 프로필 ========== */
+  function loadProfileMeta() {
+    try {
+      var o = JSON.parse(sg(PROFILE_META_KEY) || '{}');
+      if (!o || typeof o !== 'object') o = {};
+      if (!Array.isArray(o.list)) o.list = [];
+      if (!o.list.length) {
+        o.list = [{ id: 'default', name: '기본 프로필', createdAt: Date.now() }];
+      }
+      return o;
+    } catch (e) {
+      return { list: [{ id: 'default', name: '기본 프로필', createdAt: Date.now() }] };
+    }
+  }
+  function saveProfileMeta(meta) {
+    ss(PROFILE_META_KEY, JSON.stringify(meta));
+  }
+  function getActiveProfileId() {
+    return sg(PROFILE_ACTIVE_KEY) || 'default';
+  }
+  function setActiveProfileId(id) {
+    ss(PROFILE_ACTIVE_KEY, id);
+  }
+
+  var PROFILE_SKIP_KEYS = {
+    PRANA_V107_PROFILES: 1,
+    PRANA_V107_ACTIVE_PROFILE: 1
+  };
+
+  function collectAllPranaKeys() {
+    var data = {};
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k) continue;
+        if (k.indexOf('PRANA_') === 0 && !PROFILE_SKIP_KEYS[k] && k.indexOf(PROFILE_SLOT_PREFIX) !== 0) {
+          data[k] = localStorage.getItem(k);
+        }
+      }
+    } catch (e) {}
+    return data;
+  }
+
+  function snapshotCurrentToSlot(profileId) {
+    var data = collectAllPranaKeys();
+    ss(PROFILE_SLOT_PREFIX + profileId, JSON.stringify({ savedAt: Date.now(), data: data }));
+  }
+
+  function restoreSlotToCurrent(profileId) {
+    var raw = sg(PROFILE_SLOT_PREFIX + profileId);
+    var payload = null;
+    try { payload = JSON.parse(raw || '{}'); } catch (e) { payload = null; }
+    // 현재 키 중 PRANA_ 를 슬롯 내용으로 맞춤 (없는 키는 유지하되 주요 진행은 덮어씀)
+    var data = (payload && payload.data) ? payload.data : {};
+    // 기존 PRANA_ 키 삭제 후 복원하면 깨끗하지만 위험 → 슬롯에 있는 키만 덮어쓰기
+    Object.keys(data).forEach(function (k) {
+      if (k.indexOf('PRANA_') !== 0) return;
+      if (PROFILE_SKIP_KEYS[k]) return;
+      try { localStorage.setItem(k, data[k] == null ? '' : String(data[k])); } catch (e) {}
+    });
+  }
+
+  function ensureProfileModal() {
+    if (document.getElementById('v107-profile-modal')) return;
+    ensureStyle();
+    var m = document.createElement('div');
+    m.className = 'modal';
+    m.id = 'v107-profile-modal';
+    m.innerHTML =
+      '<div class="modal-content">' +
+      '<h3>👤 다중 프로필</h3>' +
+      '<p class="v107-hint">프로필마다 인연·재화·대화·해금 상태가 따로 저장됩니다.<br>전환 시 현재 진행을 저장한 뒤 새로고침합니다.</p>' +
+      '<div id="v107-profile-list"></div>' +
+      '<label>새 프로필 이름</label>' +
+      '<input class="v107-input" type="text" id="v107-profile-name" maxlength="20" placeholder="예: 서브 계정">' +
+      '<div class="v107-row">' +
+      '<button type="button" class="main-btn" onclick="window.v107CreateProfile()">프로필 추가</button>' +
+      '<button type="button" class="main-btn" style="background:#334155" onclick="window.v107CloseProfile()">닫기</button>' +
+      '</div>' +
+      '<p class="v107-status" id="v107-profile-msg"></p>' +
+      '</div>';
+    document.body.appendChild(m);
+    m.addEventListener('click', function (ev) { if (ev.target === m) window.v107CloseProfile(); });
+  }
+
+  function renderProfileList() {
+    var listEl = document.getElementById('v107-profile-list');
+    if (!listEl) return;
+    var meta = loadProfileMeta();
+    var active = getActiveProfileId();
+    listEl.innerHTML = '';
+    meta.list.forEach(function (p) {
+      var card = document.createElement('div');
+      card.className = 'v107-card' + (p.id === active ? ' active' : '');
+      card.innerHTML = '<h4>' + (p.id === active ? '✅ ' : '') + (p.name || p.id) + '</h4>' +
+        '<div class="meta">id: ' + p.id + '</div>';
+      var row = document.createElement('div');
+      row.className = 'v107-row';
+      row.style.marginTop = '8px';
+      if (p.id !== active) {
+        var sw = document.createElement('button');
+        sw.type = 'button';
+        sw.className = 'main-btn';
+        sw.textContent = '이 프로필로 전환';
+        sw.onclick = function () { window.v107SwitchProfile(p.id); };
+        row.appendChild(sw);
+      } else {
+        var save = document.createElement('button');
+        save.type = 'button';
+        save.className = 'main-btn';
+        save.style.background = '#0f766e';
+        save.textContent = '지금 상태 저장';
+        save.onclick = function () {
+          snapshotCurrentToSlot(p.id);
+          var msg = document.getElementById('v107-profile-msg');
+          if (msg) msg.textContent = '현재 진행을 이 프로필에 저장했습니다.';
+        };
+        row.appendChild(save);
+      }
+      if (p.id !== 'default') {
+        var del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'main-btn';
+        del.style.background = '#7f1d1d';
+        del.textContent = '삭제';
+        del.onclick = function () { window.v107DeleteProfile(p.id); };
+        row.appendChild(del);
+      }
+      card.appendChild(row);
+      listEl.appendChild(card);
+    });
+  }
+
+  window.v107OpenProfile = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    ensureProfileModal();
+    // 현재 활성 슬롯에 최신 스냅샷 백업
+    snapshotCurrentToSlot(getActiveProfileId());
+    renderProfileList();
+    document.getElementById('v107-profile-msg').textContent = '현재: ' + getActiveProfileId();
+    document.getElementById('v107-profile-modal').style.display = 'flex';
+  };
+  window.v107CloseProfile = function () {
+    var m = document.getElementById('v107-profile-modal');
+    if (m) m.style.display = 'none';
+  };
+  window.v107CreateProfile = function () {
+    var input = document.getElementById('v107-profile-name');
+    var name = (input && input.value) ? input.value.trim() : '';
+    if (!name) {
+      var msg = document.getElementById('v107-profile-msg');
+      if (msg) msg.textContent = '이름을 입력해 주세요.';
+      return;
+    }
+    var meta = loadProfileMeta();
+    var id = 'p_' + Date.now().toString(36);
+    // 현재 상태를 현재 슬롯에 저장 후, 새 프로필은 빈/현재 복사 중 선택: 현재 복사
+    snapshotCurrentToSlot(getActiveProfileId());
+    snapshotCurrentToSlot(id);
+    meta.list.push({ id: id, name: name, createdAt: Date.now() });
+    saveProfileMeta(meta);
+    if (input) input.value = '';
+    renderProfileList();
+    var msg2 = document.getElementById('v107-profile-msg');
+    if (msg2) msg2.textContent = '프로필 「' + name + '」을(를) 추가했습니다. (현재 진행 복사본)';
+  };
+  window.v107SwitchProfile = function (id) {
+    if (!id || id === getActiveProfileId()) return;
+    if (!confirm('프로필을 전환할까요?\n현재 진행은 저장되고, 화면이 새로고침됩니다.')) return;
+    snapshotCurrentToSlot(getActiveProfileId());
+    restoreSlotToCurrent(id);
+    setActiveProfileId(id);
+    location.reload();
+  };
+  window.v107DeleteProfile = function (id) {
+    if (id === 'default') return;
+    if (id === getActiveProfileId()) {
+      alert('사용 중인 프로필은 삭제할 수 없습니다. 다른 프로필로 전환 후 삭제하세요.');
+      return;
+    }
+    if (!confirm('이 프로필 저장 데이터를 삭제할까요?')) return;
+    var meta = loadProfileMeta();
+    meta.list = meta.list.filter(function (p) { return p.id !== id; });
+    saveProfileMeta(meta);
+    try { localStorage.removeItem(PROFILE_SLOT_PREFIX + id); } catch (e) {}
+    renderProfileList();
+  };
+
+  // 첫 실행: default 슬롯 보장
+  (function bootProfile() {
+    var meta = loadProfileMeta();
+    saveProfileMeta(meta);
+    if (!sg(PROFILE_ACTIVE_KEY)) setActiveProfileId('default');
+    if (!sg(PROFILE_SLOT_PREFIX + getActiveProfileId())) {
+      snapshotCurrentToSlot(getActiveProfileId());
+    }
+  })();
+
+  /* ========== 로컬 거래소 ========== */
+  // rates: from -> to 시 from 1개당 to 수량 (정수 거래)
+  var EXCHANGE_RATES = [
+    { from: 'credits', to: 'pyroxene', rate: 0.1, label: '크레딧 → 청휘석 (10:1)' }, // 10 credits = 1 pyro
+    { from: 'pyroxene', to: 'credits', rate: 8, label: '청휘석 → 크레딧 (1:8)' },
+    { from: 'eligma', to: 'pyroxene', rate: 0.5, label: '엘리그마 → 청휘석 (2:1)' },
+    { from: 'pyroxene', to: 'eligma', rate: 1, label: '청휘석 → 엘리그마 (1:1)' },
+    { from: 'credits', to: 'gifts', rate: 0.02, label: '크레딧 → 인연 선물 (50:1)' },
+    { from: 'gifts', to: 'credits', rate: 30, label: '인연 선물 → 크레딧 (1:30)' },
+    { from: 'credits', to: 'tickets', rate: 0.02, label: '크레딧 → 인연 티켓 (50:1)' },
+    { from: 'tickets', to: 'credits', rate: 30, label: '인연 티켓 → 크레딧 (1:30)' },
+    { from: 'eligma', to: 'gifts', rate: 0.2, label: '엘리그마 → 인연 선물 (5:1)' },
+    { from: 'pyroxene', to: 'tickets', rate: 0.25, label: '청휘석 → 인연 티켓 (4:1)' }
+  ];
+
+  function readCurrency(id) {
+    if (id === 'pyroxene') {
+      if (typeof window.getPyroxene === 'function') return Math.floor(window.getPyroxene() || 0);
+      return Math.floor(Number(sg('PRANA_PYROXENE') || 0) || 0);
+    }
+    if (id === 'credits') {
+      return Math.floor(Number(sg('PRANA_SCHALE_CREDITS') || 0) || 0);
+    }
+    if (id === 'eligma') {
+      if (typeof window.getEligma === 'function') return Math.floor(window.getEligma() || 0);
+      return Math.floor(Number(sg('PRANA_V103_ELIGMA') || 0) || 0);
+    }
+    if (id === 'tickets') {
+      return Math.floor(Number(sg('PRANA_BOND_TICKETS') || 0) || 0);
+    }
+    if (id === 'gifts') {
+      return Math.floor(Number(sg('PRANA_BOND_GIFTS') || 0) || 0);
+    }
+    return 0;
+  }
+
+  function writeCurrency(id, value) {
+    value = Math.max(0, Math.floor(value));
+    if (id === 'pyroxene') {
+      if (typeof window.addPyroxene === 'function' && typeof window.getPyroxene === 'function') {
+        var cur = window.getPyroxene();
+        window.addPyroxene(value - cur);
+      } else {
+        ss('PRANA_PYROXENE', String(value));
+      }
+      return;
+    }
+    if (id === 'credits') {
+      ss('PRANA_SCHALE_CREDITS', String(value));
+      try { if (typeof schaleCredits !== 'undefined') schaleCredits = value; } catch (e) {}
+      return;
+    }
+    if (id === 'eligma') {
+      if (typeof window.addEligma === 'function' && typeof window.getEligma === 'function') {
+        var e0 = window.getEligma();
+        window.addEligma(value - e0);
+      } else {
+        ss('PRANA_V103_ELIGMA', String(value));
+      }
+      return;
+    }
+    if (id === 'tickets') {
+      ss('PRANA_BOND_TICKETS', String(value));
+      try { if (typeof bondTickets !== 'undefined') bondTickets = value; } catch (e) {}
+      return;
+    }
+    if (id === 'gifts') {
+      ss('PRANA_BOND_GIFTS', String(value));
+      try { if (typeof bondGifts !== 'undefined') bondGifts = value; } catch (e) {}
+      return;
+    }
+  }
+
+  var CUR_LABEL = {
+    credits: '🪙 크레딧',
+    pyroxene: '💎 청휘석',
+    eligma: '✨ 엘리그마',
+    tickets: '🎫 인연 티켓',
+    gifts: '🎁 인연 선물'
+  };
+
+  function ensureExchangeModal() {
+    if (document.getElementById('v107-exchange-modal')) return;
+    ensureStyle();
+    var m = document.createElement('div');
+    m.className = 'modal';
+    m.id = 'v107-exchange-modal';
+    var opts = EXCHANGE_RATES.map(function (r, i) {
+      return '<option value="' + i + '">' + r.label + '</option>';
+    }).join('');
+    m.innerHTML =
+      '<div class="modal-content">' +
+      '<h3>🏦 로컬 거래소</h3>' +
+      '<p class="v107-hint">이 기기 안에서만 재화를 교환합니다. (서버 없음)<br>환율은 상점과 다르게 약간의 수수료가 있습니다.</p>' +
+      '<div class="v107-bal" id="v107-ex-bal"></div>' +
+      '<label>교환 종류</label>' +
+      '<select class="v107-select" id="v107-ex-pair" onchange="window.v107ExPreview()">' + opts + '</select>' +
+      '<label>지불 수량 (From)</label>' +
+      '<input class="v107-input" type="number" id="v107-ex-amount" min="1" value="10" inputmode="numeric" oninput="window.v107ExPreview()">' +
+      '<div class="v107-bal" id="v107-ex-preview">미리보기</div>' +
+      '<div class="v107-row">' +
+      '<button type="button" class="main-btn" onclick="window.v107DoExchange()">교환하기</button>' +
+      '<button type="button" class="main-btn" style="background:#334155" onclick="window.v107CloseExchange()">닫기</button>' +
+      '</div>' +
+      '<p class="v107-status" id="v107-ex-msg"></p>' +
+      '</div>';
+    document.body.appendChild(m);
+    m.addEventListener('click', function (ev) { if (ev.target === m) window.v107CloseExchange(); });
+  }
+
+  function refreshExBal() {
+    var el = document.getElementById('v107-ex-bal');
+    if (!el) return;
+    el.innerHTML = ['credits', 'pyroxene', 'eligma', 'tickets', 'gifts'].map(function (id) {
+      return CUR_LABEL[id] + ' ' + readCurrency(id).toLocaleString();
+    }).join('<br>');
+  }
+
+  window.v107ExPreview = function () {
+    var pairEl = document.getElementById('v107-ex-pair');
+    var amtEl = document.getElementById('v107-ex-amount');
+    var prev = document.getElementById('v107-ex-preview');
+    if (!pairEl || !amtEl || !prev) return;
+    var r = EXCHANGE_RATES[Number(pairEl.value)] || EXCHANGE_RATES[0];
+    var pay = Math.max(0, Math.floor(Number(amtEl.value) || 0));
+    var gain = 0;
+    // rate is to-per-from; for fractional rates require enough from
+    if (r.rate >= 1) {
+      gain = Math.floor(pay * r.rate);
+    } else {
+      // e.g. 0.1 means 10 from = 1 to
+      var needPer = Math.round(1 / r.rate);
+      gain = Math.floor(pay / needPer);
+    }
+    prev.textContent = CUR_LABEL[r.from] + ' -' + pay.toLocaleString() + '  →  ' + CUR_LABEL[r.to] + ' +' + gain.toLocaleString();
+  };
+
+  window.v107OpenExchange = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    ensureExchangeModal();
+    refreshExBal();
+    window.v107ExPreview();
+    document.getElementById('v107-ex-msg').textContent = '';
+    document.getElementById('v107-exchange-modal').style.display = 'flex';
+  };
+  window.v107CloseExchange = function () {
+    var m = document.getElementById('v107-exchange-modal');
+    if (m) m.style.display = 'none';
+  };
+  window.v107DoExchange = function () {
+    var pairEl = document.getElementById('v107-ex-pair');
+    var amtEl = document.getElementById('v107-ex-amount');
+    var msg = document.getElementById('v107-ex-msg');
+    var r = EXCHANGE_RATES[Number(pairEl && pairEl.value)] || EXCHANGE_RATES[0];
+    var pay = Math.max(0, Math.floor(Number(amtEl && amtEl.value) || 0));
+    if (pay <= 0) {
+      if (msg) msg.textContent = '수량을 입력해 주세요.';
+      return;
+    }
+    var gain = 0;
+    if (r.rate >= 1) gain = Math.floor(pay * r.rate);
+    else {
+      var needPer = Math.round(1 / r.rate);
+      gain = Math.floor(pay / needPer);
+      pay = gain * needPer; // 실제 차감은 배수만
+      if (amtEl) amtEl.value = String(pay || Number(amtEl.value));
+    }
+    if (gain <= 0) {
+      if (msg) msg.textContent = '환율상 받을 수량이 0입니다. 더 많이 지불해 주세요.';
+      return;
+    }
+    var have = readCurrency(r.from);
+    if (have < pay) {
+      if (msg) msg.textContent = '잔액이 부족합니다. (보유 ' + have.toLocaleString() + ')';
+      return;
+    }
+    writeCurrency(r.from, have - pay);
+    writeCurrency(r.to, readCurrency(r.to) + gain);
+    try {
+      if (typeof updateBondCurrencyUI === 'function') updateBondCurrencyUI();
+      if (typeof refreshShopDisplays === 'function') refreshShopDisplays();
+      if (typeof updateAllCurrencyDisplays === 'function') updateAllCurrencyDisplays();
+    } catch (e) {}
+    refreshExBal();
+    window.v107ExPreview();
+    if (msg) msg.textContent = '✅ 교환 완료: ' + CUR_LABEL[r.from] + ' -' + pay + ' → ' + CUR_LABEL[r.to] + ' +' + gain;
+  };
+
+  /* ========== 동시 접속 시뮬레이션 (단톡) ========== */
+  function isSimEnabled() {
+    var v = sg(SIM_KEY);
+    if (v === '') return true; // 기본 ON
+    return v !== '0' && v !== 'false';
+  }
+  function setSimEnabled(on) {
+    ss(SIM_KEY, on ? '1' : '0');
+  }
+
+  function showMultiTyping(memberNames) {
+    var wrap = document.createElement('div');
+    wrap.className = 'v107-sim-row';
+    wrap.id = 'v107-sim-typing';
+    memberNames.forEach(function (name, idx) {
+      var chip = document.createElement('div');
+      chip.className = 'v107-sim-chip';
+      chip.style.opacity = '0';
+      chip.style.transition = 'opacity .25s';
+      chip.innerHTML = '<strong>' + name + '</strong> 입력 중<span class="dots"><span></span><span></span><span></span></span>';
+      wrap.appendChild(chip);
+      setTimeout(function () { chip.style.opacity = '1'; }, 80 + idx * 220);
+    });
+    var chat = document.getElementById('chat-container');
+    if (chat) {
+      chat.appendChild(wrap);
+      chat.scrollTop = chat.scrollHeight;
+    }
+    return wrap;
+  }
+
+  function removeMultiTyping() {
+    var el = document.getElementById('v107-sim-typing');
+    if (el) el.remove();
+  }
+
+  function pickSimMembers(persona) {
+    if (!persona || !persona.isGroup || !Array.isArray(persona.members)) return [];
+    var names = persona.members.map(function (id) {
+      try {
+        return (typeof PERSONAS !== 'undefined' && PERSONAS[id]) ? PERSONAS[id].name : id;
+      } catch (e) { return id; }
+    }).filter(Boolean);
+    // 2~min(4, n) 명 랜덤
+    var n = names.length;
+    if (n <= 1) return names;
+    var count = 2 + Math.floor(Math.random() * Math.min(3, n - 1));
+    count = Math.min(count, n);
+    var shuffled = names.slice().sort(function () { return Math.random() - 0.5; });
+    return shuffled.slice(0, count);
+  }
+
+  function hookSendMessageForSim() {
+    if (typeof window.sendMessage !== 'function' && typeof sendMessage !== 'function') {
+      // sendMessage may be local in script scope - try patch via DOM send button later
+    }
+    // Override global if exposed
+    var tryPatch = function () {
+      // Many builds keep sendMessage in closure; intercept by wrapping the button onclick and also
+      // MutationObserver on loading-row is fragile. Instead patch prototype-free: replace onclick on send-btn
+      // and also replace window.sendMessage if exists.
+      var original = null;
+      try {
+        if (typeof sendMessage === 'function') original = sendMessage;
+      } catch (e) {}
+      if (typeof window.sendMessage === 'function') original = window.sendMessage;
+
+      // Can't access closure sendMessage easily. Use MutationObserver: when #loading-row appears in group mode, inject sim chips before it.
+      if (window.__v107SimObs) return;
+      var chat = document.getElementById('chat-container');
+      if (!chat) return;
+      window.__v107SimObs = new MutationObserver(function (muts) {
+        if (!isSimEnabled()) return;
+        muts.forEach(function (m) {
+          m.addedNodes && Array.prototype.forEach.call(m.addedNodes, function (node) {
+            if (!node || node.id !== 'loading-row') return;
+            try {
+              var persona = null;
+              try {
+                if (typeof PERSONAS !== 'undefined' && typeof currentMode !== 'undefined') {
+                  persona = PERSONAS[currentMode] || null;
+                }
+              } catch (e0) { persona = null; }
+              if (!persona || !persona.isGroup) {
+                var bar = document.getElementById('mention-bar');
+                var sub = document.getElementById('bot-sub');
+                var isGroupUi = (bar && bar.style.display !== 'none' && bar.children.length > 0) ||
+                  (sub && /단톡/.test(sub.textContent || ''));
+                if (!isGroupUi) return;
+                var namesFromUi = [];
+                if (bar) {
+                  Array.prototype.forEach.call(bar.querySelectorAll('.mention-tag-btn'), function (btn) {
+                    var t = (btn.textContent || '').replace(/^@/, '').trim();
+                    if (t) namesFromUi.push(t);
+                  });
+                }
+                if (!namesFromUi.length) return;
+                persona = { isGroup: true, _uiNames: namesFromUi };
+              }
+              if (document.getElementById('v107-sim-typing')) return;
+              var names = persona._uiNames
+                ? persona._uiNames.slice().sort(function () { return Math.random() - 0.5; }).slice(0, Math.min(3, Math.max(2, persona._uiNames.length)))
+                : pickSimMembers(persona);
+              if (!names.length) return;
+              var wrap = showMultiTyping(names);
+              // place before loading-row
+              if (wrap && node.parentNode) {
+                node.parentNode.insertBefore(wrap, node);
+              }
+              // hide single loading bubble content optionally - keep it
+            } catch (e) {}
+          });
+          m.removedNodes && Array.prototype.forEach.call(m.removedNodes, function (node) {
+            if (node && node.id === 'loading-row') removeMultiTyping();
+          });
+        });
+      });
+      window.__v107SimObs.observe(chat, { childList: true });
+    };
+    tryPatch();
+    setTimeout(tryPatch, 800);
+    setTimeout(tryPatch, 2000);
+  }
+
+  window.v107ToggleSim = function () {
+    var on = !isSimEnabled();
+    setSimEnabled(on);
+    alert(on
+      ? '단톡 동시 접속 시뮬레이션: ON\n여러 부원이 동시에 「입력 중」으로 표시됩니다.'
+      : '단톡 동시 접속 시뮬레이션: OFF');
+    injectMenu();
+  };
+
+  /* ========== 메뉴 주입 ========== */
+  function injectMenu() {
+    var list = document.querySelector('#main-menu-modal .menu-list');
+    if (!list) return;
+
+    function addBtn(id, label, search, onClick, afterText) {
+      var existing = document.getElementById(id);
+      if (existing) {
+        existing.onclick = onClick;
+        return existing;
+      }
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.id = id;
+      b.className = 'menu-item-btn';
+      b.setAttribute('data-search', search);
+      b.textContent = label;
+      b.onclick = onClick;
+      var anchor = null;
+      if (afterText) {
+        anchor = Array.prototype.find.call(list.querySelectorAll('.menu-item-btn'), function (el) {
+          return (el.textContent || '').indexOf(afterText) >= 0;
+        });
+      }
+      if (anchor && anchor.nextSibling) list.insertBefore(b, anchor.nextSibling);
+      else if (anchor) list.appendChild(b);
+      else list.appendChild(b);
+      return b;
+    }
+
+    addBtn('v107-summary-menu', '📋 싯딤 요약 (단톡)', '요약 summary 싯딤 아로나 프라나 노로나 시레나', function () {
+      window.v107OpenSummary();
+    }, '단톡방');
+
+    addBtn('v107-profile-menu', '👤 다중 프로필', '프로필 profile 계정 다중 multi', function () {
+      window.v107OpenProfile();
+    }, '선생님 프로필');
+
+    addBtn('v107-exchange-menu', '🏦 로컬 거래소', '거래소 exchange 환전 교환 재화', function () {
+      window.v107OpenExchange();
+    }, '샬레 상점');
+
+    var simLabel = '📡 동시 접속 시뮬 ' + (isSimEnabled() ? 'ON' : 'OFF');
+    var simBtn = addBtn('v107-sim-menu', simLabel, '동시 접속 시뮬레이션 typing online sim 단톡', function () {
+      window.v107ToggleSim();
+    }, '단톡방');
+    if (simBtn) simBtn.textContent = simLabel;
+  }
+
+  function boot() {
+    ensureStyle();
+    hookSecretForSummary();
+    syncSummaryUnlockFromOwned();
+    hookSendMessageForSim();
+    injectMenu();
+    setInterval(injectMenu, 2000);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+
+
+<script id="v108-custom-ost">
+/* v10.8: 커스텀 OST — YouTube / 직접 오디오 URL을 BGM으로 추가 */
+(function () {
+  'use strict';
+
+  var STORAGE_KEY = 'PRANA_CUSTOM_OST';
+  var ACTIVE_KEY = 'PRANA_CUSTOM_OST_ACTIVE';
+  var MAX_TRACKS = 30;
+
+  function sg(k) {
+    try {
+      if (typeof safeGet === 'function') return safeGet(k) || '';
+      return localStorage.getItem(k) || '';
+    } catch (e) { return ''; }
+  }
+  function ss(k, v) {
+    try {
+      if (typeof safeSet === 'function') safeSet(k, v);
+      else localStorage.setItem(k, String(v));
+    } catch (e) {}
+  }
+
+  function loadTracks() {
+    try {
+      var arr = JSON.parse(sg(STORAGE_KEY) || '[]');
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function saveTracks(list) {
+    ss(STORAGE_KEY, JSON.stringify(list.slice(0, MAX_TRACKS)));
+  }
+
+  function extractYoutubeId(url) {
+    if (!url) return null;
+    var s = String(url).trim();
+    // youtu.be/ID
+    var m = s.match(/(?:youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+    if (m) return m[1];
+    // youtube.com/watch?v=ID
+    m = s.match(/[?&]v=([A-Za-z0-9_-]{6,})/);
+    if (m) return m[1];
+    // youtube.com/embed/ID | /shorts/ID | /live/ID
+    m = s.match(/youtube\.com\/(?:embed|shorts|live)\/([A-Za-z0-9_-]{6,})/);
+    if (m) return m[1];
+    // music.youtube.com
+    m = s.match(/music\.youtube\.com\/watch\?v=([A-Za-z0-9_-]{6,})/);
+    if (m) return m[1];
+    return null;
+  }
+
+  function isDirectAudioUrl(url) {
+    if (!url) return false;
+    var s = String(url).trim().toLowerCase();
+    if (!/^https?:\/\//.test(s)) return false;
+    if (extractYoutubeId(url)) return false;
+    // extension or common CDN audio paths
+    if (/\.(mp3|ogg|opus|wav|m4a|aac|flac)(\?|#|$)/i.test(s)) return true;
+    if (/soundcloud\.com|sndcdn\.com|archive\.org|dropbox\.com|drive\.google|mediafire|cdn\.|audio/i.test(s)) return true;
+    return /^https?:\/\//.test(s); // allow try — browser will error if not audio
+  }
+
+  function classifyUrl(url) {
+    var yt = extractYoutubeId(url);
+    if (yt) return { type: 'youtube', id: yt, playUrl: 'https://www.youtube.com/embed/' + yt + '?autoplay=1&loop=1&playlist=' + yt + '&controls=1&rel=0&modestbranding=1' };
+    if (isDirectAudioUrl(url)) return { type: 'audio', id: null, playUrl: String(url).trim() };
+    return { type: 'unknown', id: null, playUrl: String(url).trim() };
+  }
+
+  function ensureStyle() {
+    if (document.getElementById('v108-ost-style')) return;
+    var s = document.createElement('style');
+    s.id = 'v108-ost-style';
+    s.textContent = [
+      '#v108-ost-modal .modal-content{max-width:420px}',
+      '.v108-hint{font-size:12px;color:#8a9bb0;line-height:1.55;margin-bottom:10px;text-align:center}',
+      '.v108-status{font-size:12px;text-align:center;min-height:18px;margin:8px 0;color:var(--accent-color);font-weight:700;white-space:pre-line}',
+      '.v108-card{padding:10px 12px;border:1px solid var(--border-color);border-radius:10px;background:var(--bg-color);margin-bottom:8px}',
+      '.v108-card.active{border-color:var(--accent-color);background:color-mix(in srgb,var(--accent-color) 12%,transparent)}',
+      '.v108-card h4{font-size:13px;margin:0 0 4px}',
+      '.v108-card .meta{font-size:11px;color:#8a9bb0;word-break:break-all}',
+      '.v108-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}',
+      '.v108-row .main-btn{flex:1;margin:0;min-width:90px;padding:9px}',
+      'input.v108-input{width:100%;padding:10px;background:var(--bg-color);border:1px solid var(--border-color);color:var(--text-color);border-radius:6px;margin-bottom:10px;font-size:14px}',
+      '#v108-yt-player-wrap{display:none;position:fixed;right:max(10px,env(safe-area-inset-right));bottom:max(78px,calc(env(safe-area-inset-bottom)+70px));z-index:50;width:min(280px,90vw);background:var(--card-bg);border:1px solid var(--border-color);border-radius:12px;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,.45)}',
+      '#v108-yt-player-wrap.show{display:block}',
+      '#v108-yt-player-wrap .v108-yt-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;font-size:11px;font-weight:700;background:var(--bg-color);border-bottom:1px solid var(--border-color);color:var(--text-color)}',
+      '#v108-yt-player-wrap iframe{width:100%;height:158px;border:0;display:block;background:#000}',
+      '#v108-yt-player-wrap .v108-yt-actions{display:flex;gap:4px}',
+      '#v108-yt-player-wrap .v108-yt-actions button{border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer}',
+      '.v108-badge{display:inline-block;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:700;margin-left:4px;border:1px solid var(--accent-color);color:var(--accent-color)}',
+      '.v108-badge.yt{border-color:#f87171;color:#f87171}',
+      '.v108-badge.au{border-color:#34d399;color:#34d399}'
+    ].join('');
+    document.head.appendChild(s);
+  }
+
+  function ensureYtPlayer() {
+    if (document.getElementById('v108-yt-player-wrap')) return;
+    var wrap = document.createElement('div');
+    wrap.id = 'v108-yt-player-wrap';
+    wrap.innerHTML =
+      '<div class="v108-yt-bar">' +
+      '<span id="v108-yt-title">YouTube OST</span>' +
+      '<div class="v108-yt-actions">' +
+      '<button type="button" onclick="window.v108MinimizeYt()" title="최소화">—</button>' +
+      '<button type="button" onclick="window.v108StopCustomOst()" title="중지">✕</button>' +
+      '</div></div>' +
+      '<div id="v108-yt-frame-slot"></div>';
+    document.body.appendChild(wrap);
+  }
+
+  function pauseNativeBgm() {
+    try {
+      if (typeof window.pauseBgm === 'function') window.pauseBgm();
+      else {
+        var a = document.getElementById('bgm-player');
+        if (a) { a.pause(); a.removeAttribute('src'); a.load(); }
+      }
+    } catch (e) {}
+  }
+
+  function stopYt() {
+    var wrap = document.getElementById('v108-yt-player-wrap');
+    if (wrap) {
+      wrap.classList.remove('show');
+      var slot = document.getElementById('v108-yt-frame-slot');
+      if (slot) slot.innerHTML = '';
+    }
+  }
+
+  function playYoutube(track) {
+    ensureYtPlayer();
+    pauseNativeBgm();
+    var info = classifyUrl(track.url);
+    var slot = document.getElementById('v108-yt-frame-slot');
+    var title = document.getElementById('v108-yt-title');
+    if (title) title.textContent = '▶ ' + (track.title || 'YouTube OST');
+    if (slot) {
+      slot.innerHTML = '<iframe src="' + info.playUrl +
+        '" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen title="Custom OST"></iframe>';
+    }
+    var wrap = document.getElementById('v108-yt-player-wrap');
+    if (wrap) wrap.classList.add('show');
+    ss(ACTIVE_KEY, track.id);
+  }
+
+  function playDirectAudio(track) {
+    stopYt();
+    var audio = document.getElementById('bgm-player');
+    if (!audio) {
+      alert('BGM 플레이어를 찾을 수 없습니다.');
+      return;
+    }
+    try {
+      audio.pause();
+    } catch (e) {}
+    audio.loop = true;
+    audio.src = track.url;
+    audio.load();
+    var p = audio.play();
+    if (p && typeof p.then === 'function') {
+      p.then(function () {}).catch(function (err) {
+        alert('재생 실패: 직접 오디오 URL만 지원됩니다.\\n(CORS·포맷 제한 가능)\\n\\n' + (err && err.message ? err.message : ''));
+      });
+    }
+    ss(ACTIVE_KEY, track.id);
+    try {
+      var status = document.getElementById('bgm-status');
+      if (status) status.textContent = '커스텀 OST · ' + (track.title || '');
+    } catch (e2) {}
+  }
+
+  window.v108PlayTrack = function (id) {
+    var list = loadTracks();
+    var track = list.find(function (t) { return t.id === id; });
+    if (!track) { alert('트랙을 찾을 수 없습니다.'); return; }
+    var kind = classifyUrl(track.url);
+    if (kind.type === 'youtube') playYoutube(track);
+    else playDirectAudio(track);
+    renderList();
+    injectIntoBgmList();
+  };
+
+  window.v108StopCustomOst = function () {
+    stopYt();
+    try {
+      var a = document.getElementById('bgm-player');
+      if (a && a.src && String(a.src).indexOf('data:') !== 0) {
+        // only stop if it looks like custom external url
+        var active = sg(ACTIVE_KEY);
+        var list = loadTracks();
+        var t = list.find(function (x) { return x.id === active; });
+        if (t && a.src.indexOf(t.url.split('?')[0]) >= 0) {
+          a.pause();
+        }
+      }
+    } catch (e) {}
+    ss(ACTIVE_KEY, '');
+    renderList();
+  };
+
+  window.v108MinimizeYt = function () {
+    var wrap = document.getElementById('v108-yt-player-wrap');
+    if (!wrap) return;
+    var slot = document.getElementById('v108-yt-frame-slot');
+    if (slot && slot.style.display === 'none') {
+      slot.style.display = 'block';
+    } else if (slot) {
+      slot.style.display = 'none';
+    }
+  };
+
+  window.v108DeleteTrack = function (id) {
+    if (!confirm('이 커스텀 OST를 삭제할까요?')) return;
+    var list = loadTracks().filter(function (t) { return t.id !== id; });
+    saveTracks(list);
+    if (sg(ACTIVE_KEY) === id) window.v108StopCustomOst();
+    renderList();
+    injectIntoBgmList();
+  };
+
+  window.v108AddTrack = function () {
+    var titleEl = document.getElementById('v108-ost-title');
+    var urlEl = document.getElementById('v108-ost-url');
+    var msg = document.getElementById('v108-ost-msg');
+    var title = (titleEl && titleEl.value) ? titleEl.value.trim() : '';
+    var url = (urlEl && urlEl.value) ? urlEl.value.trim() : '';
+    if (!url) {
+      if (msg) msg.textContent = '음악 링크(URL)를 입력해 주세요.';
+      return;
+    }
+    var kind = classifyUrl(url);
+    if (kind.type === 'unknown' && !/^https?:\/\//i.test(url)) {
+      if (msg) msg.textContent = 'http(s)로 시작하는 URL을 입력해 주세요.';
+      return;
+    }
+    if (!title) {
+      if (kind.type === 'youtube') title = 'YouTube OST';
+      else title = '커스텀 트랙';
+    }
+    var list = loadTracks();
+    if (list.length >= MAX_TRACKS) {
+      if (msg) msg.textContent = '최대 ' + MAX_TRACKS + '곡까지 저장할 수 있습니다.';
+      return;
+    }
+    // dedupe by url
+    if (list.some(function (t) { return t.url === url; })) {
+      if (msg) msg.textContent = '이미 같은 링크가 등록되어 있습니다.';
+      return;
+    }
+    var track = {
+      id: 'ost_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e4),
+      title: title.slice(0, 40),
+      url: url,
+      type: kind.type === 'youtube' ? 'youtube' : 'audio',
+      createdAt: Date.now()
+    };
+    list.push(track);
+    saveTracks(list);
+    if (titleEl) titleEl.value = '';
+    if (urlEl) urlEl.value = '';
+    if (msg) msg.textContent = '✅ 추가됨: ' + track.title;
+    renderList();
+    injectIntoBgmList();
+  };
+
+  function renderList() {
+    var box = document.getElementById('v108-ost-list');
+    if (!box) return;
+    var list = loadTracks();
+    var active = sg(ACTIVE_KEY);
+    if (!list.length) {
+      box.innerHTML = '<p class="v108-hint" style="margin:0">아직 추가된 커스텀 OST가 없습니다.<br>아래에서 링크를 등록해 보세요.</p>';
+      return;
+    }
+    box.innerHTML = '';
+    list.forEach(function (t) {
+      var card = document.createElement('div');
+      card.className = 'v108-card' + (t.id === active ? ' active' : '');
+      var badge = t.type === 'youtube'
+        ? '<span class="v108-badge yt">YouTube</span>'
+        : '<span class="v108-badge au">Audio</span>';
+      card.innerHTML =
+        '<h4>' + (t.id === active ? '▶ ' : '') + escapeHtml(t.title) + badge + '</h4>' +
+        '<div class="meta">' + escapeHtml(t.url) + '</div>';
+      var row = document.createElement('div');
+      row.className = 'v108-row';
+      var play = document.createElement('button');
+      play.type = 'button';
+      play.className = 'main-btn';
+      play.textContent = t.id === active ? '재생 중' : '재생';
+      play.onclick = function () { window.v108PlayTrack(t.id); };
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'main-btn';
+      del.style.background = '#7f1d1d';
+      del.textContent = '삭제';
+      del.onclick = function () { window.v108DeleteTrack(t.id); };
+      row.appendChild(play);
+      row.appendChild(del);
+      card.appendChild(row);
+      box.appendChild(card);
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function ensureModal() {
+    if (document.getElementById('v108-ost-modal')) return;
+    ensureStyle();
+    ensureYtPlayer();
+    var m = document.createElement('div');
+    m.className = 'modal';
+    m.id = 'v108-ost-modal';
+    m.innerHTML =
+      '<div class="modal-content">' +
+      '<h3>🎧 커스텀 OST</h3>' +
+      '<p class="v108-hint">유튜브·직접 오디오 링크를 OST로 등록합니다.<br>' +
+      '• <b>YouTube</b>: 영상/Shorts/Music 링크 → 미니 플레이어<br>' +
+      '• <b>직접 오디오</b>: .mp3 / .ogg / .m4a 등 공개 URL<br>' +
+      '스포티파이·애플뮤직 등 앱 전용 링크는 재생이 안 될 수 있습니다.</p>' +
+      '<div id="v108-ost-list"></div>' +
+      '<hr style="border:none;border-top:1px solid var(--border-color);margin:12px 0">' +
+      '<label>트랙 이름 (선택)</label>' +
+      '<input class="v108-input" type="text" id="v108-ost-title" maxlength="40" placeholder="예: Target for Love">' +
+      '<label>음악 링크 (URL)</label>' +
+      '<input class="v108-input" type="url" id="v108-ost-url" placeholder="https://youtu.be/... 또는 https://...mp3" inputmode="url" autocomplete="off">' +
+      '<div class="v108-row">' +
+      '<button type="button" class="main-btn" onclick="window.v108AddTrack()">➕ 추가</button>' +
+      '<button type="button" class="main-btn" style="background:#334155" onclick="window.v108StopCustomOst()">⏹ 커스텀 중지</button>' +
+      '</div>' +
+      '<p class="v108-status" id="v108-ost-msg"></p>' +
+      '<button type="button" class="main-btn" style="background:#334155;margin-top:4px" onclick="window.v108CloseOst()">닫기</button>' +
+      '</div>';
+    document.body.appendChild(m);
+    m.addEventListener('click', function (ev) { if (ev.target === m) window.v108CloseOst(); });
+  }
+
+  window.v108OpenOst = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    ensureModal();
+    renderList();
+    var msg = document.getElementById('v108-ost-msg');
+    if (msg) msg.textContent = '';
+    document.getElementById('v108-ost-modal').style.display = 'flex';
+  };
+  window.v108CloseOst = function () {
+    var m = document.getElementById('v108-ost-modal');
+    if (m) m.style.display = 'none';
+  };
+
+  /* BGM 설정 모달 트랙 목록에 커스텀 곡 버튼 주입 */
+  function injectIntoBgmList() {
+    var box = document.getElementById('bgm-track-list');
+    if (!box) return;
+    // remove previous injected
+    Array.prototype.slice.call(box.querySelectorAll('[data-v108-ost]')).forEach(function (el) { el.remove(); });
+    var list = loadTracks();
+    if (!list.length) return;
+    var active = sg(ACTIVE_KEY);
+    var header = document.createElement('div');
+    header.setAttribute('data-v108-ost', '1');
+    header.style.cssText = 'font-size:11px;font-weight:700;color:var(--accent-color);padding:6px 2px 2px;opacity:.95';
+    header.textContent = '🎧 커스텀 OST';
+    box.appendChild(header);
+    list.forEach(function (t) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'menu-item-btn';
+      btn.setAttribute('data-v108-ost', t.id);
+      var isOn = t.id === active;
+      if (isOn) {
+        btn.style.borderColor = 'var(--accent-color)';
+        btn.style.background = 'rgba(138,43,226,0.18)';
+      }
+      var kindLabel = t.type === 'youtube' ? 'YouTube' : 'Audio URL';
+      btn.innerHTML =
+        (isOn ? '▶ ' : '○ ') +
+        '<strong>' + escapeHtml(t.title) + '</strong>' +
+        '<span style="display:block;font-size:11px;color:#8a9bb0;font-weight:normal;margin-top:2px;">' +
+        kindLabel + '</span>';
+      btn.onclick = function () { window.v108PlayTrack(t.id); };
+      box.appendChild(btn);
+    });
+  }
+
+  function hookBgmModal() {
+    if (window.openBgmModal && !window.openBgmModal.__v108) {
+      var orig = window.openBgmModal;
+      window.openBgmModal = function () {
+        orig.apply(this, arguments);
+        setTimeout(injectIntoBgmList, 50);
+        setTimeout(injectIntoBgmList, 300);
+      };
+      window.openBgmModal.__v108 = true;
+    }
+  }
+
+  function injectMenu() {
+    var list = document.querySelector('#main-menu-modal .menu-list');
+    if (!list) return;
+    if (document.getElementById('v108-ost-menu')) {
+      var existing = document.getElementById('v108-ost-menu');
+      existing.onclick = function () { window.v108OpenOst(); };
+      return;
+    }
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'v108-ost-menu';
+    b.className = 'menu-item-btn';
+    b.setAttribute('data-search', '커스텀 ost 음악 youtube 유튜브 bgm 링크 music custom');
+    b.textContent = '🎧 커스텀 OST 추가';
+    b.onclick = function () { window.v108OpenOst(); };
+    var bgmBtn = Array.prototype.find.call(list.querySelectorAll('.menu-item-btn'), function (el) {
+      return (el.textContent || '').indexOf('BGM') >= 0;
+    });
+    if (bgmBtn && bgmBtn.nextSibling) list.insertBefore(b, bgmBtn.nextSibling);
+    else if (bgmBtn) list.appendChild(b);
+    else list.appendChild(b);
+  }
+
+  function boot() {
+    ensureStyle();
+    ensureYtPlayer();
+    hookBgmModal();
+    injectMenu();
+    setInterval(function () {
+      injectMenu();
+      hookBgmModal();
+    }, 2000);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
