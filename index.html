@@ -20930,4 +20930,1235 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
 })();
 </script>
 
+
+<style id="v111-world-state-style">
+  #v111-ws-modal { display:none; position:fixed; inset:0; z-index:10050; background:rgba(0,0,0,.78); align-items:center; justify-content:center; padding:16px; box-sizing:border-box; }
+  #v111-ws-modal.open { display:flex !important; }
+  #v111-ws-modal .v111-box { background:var(--card-bg,#151a24); border:1px solid var(--border-color,#2a3447); border-radius:14px; padding:16px; width:100%; max-width:420px; max-height:85vh; overflow-y:auto; color:var(--text-color,#e0e6ed); box-sizing:border-box; }
+  #v111-ws-modal h3 { text-align:center; margin:0 0 6px; font-size:16px; }
+  .v111-meta { font-size:12px; color:#8a9bb0; line-height:1.45; text-align:center; margin-bottom:12px; }
+  .v111-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 12px; background:var(--bg-color,#0b0e14); border:1px solid var(--border-color,#2a3447); border-radius:10px; margin-bottom:8px; }
+  .v111-row .desc b { display:block; font-size:14px; margin-bottom:2px; }
+  .v111-row .desc span { display:block; color:#8a9bb0; font-size:11px; line-height:1.4; }
+  .v111-switch { min-width:58px; padding:7px 9px; border:1px solid var(--border-color); border-radius:999px; background:#334155; color:#fff; font-weight:700; cursor:pointer; font-size:12px; }
+  .v111-switch.on { background:var(--accent-color,#8a2be2); border-color:#b19ffb; }
+  .v111-student-list { display:flex; flex-direction:column; gap:6px; max-height:48vh; overflow-y:auto; margin-top:8px; }
+  .v111-student-item { display:flex; align-items:center; gap:8px; padding:9px 10px; background:var(--bg-color,#0b0e14); border:1px solid var(--border-color,#2a3447); border-radius:9px; }
+  .v111-student-item .av { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; background:var(--card-bg); border:1px solid var(--border-color); flex-shrink:0; font-size:13px; }
+  .v111-student-item .nm { flex:1; min-width:0; }
+  .v111-student-item .nm b { display:block; font-size:13px; }
+  .v111-student-item .nm span { display:block; font-size:11px; color:#8a9bb0; }
+  .v111-status-select { padding:5px 8px; border-radius:7px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-color); font-size:12px; max-width:110px; }
+  .v111-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; border:1px solid; }
+  .v111-badge.available { border-color:#34d399; color:#34d399; }
+  .v111-badge.classroom { border-color:#60a5fa; color:#60a5fa; }
+  .v111-badge.outing { border-color:#fbbf24; color:#fbbf24; }
+  .v111-badge.training { border-color:#f97316; color:#f97316; }
+  .v111-badge.sleeping { border-color:#a78bfa; color:#a78bfa; }
+  .v111-badge.mission { border-color:#f87171; color:#f87171; }
+  .v111-badge.unreachable { border-color:#94a3b8; color:#94a3b8; }
+  #v111-ws-status-bar { display:none; margin:0 14px 8px; padding:8px 12px; border:1px solid var(--border-color); border-radius:10px; background:var(--card-bg); color:var(--text-color); font-size:12px; line-height:1.45; }
+  #v111-ws-status-bar.show { display:block; }
+  #v111-ws-status-bar strong { color:var(--accent-color); }
+  .v111-btn { width:100%; margin-top:8px; padding:10px; border:none; border-radius:8px; background:var(--accent-color,#8a2be2); color:#fff; font-weight:700; cursor:pointer; font-size:14px; }
+  .v111-btn.gray { background:#334155; }
+  .v111-btn.small { width:auto; padding:6px 12px; font-size:12px; margin-top:0; }
+</style>
+
+<div id="v111-ws-modal">
+  <div class="v111-box">
+    <h3>🌍 살아있는 키보토스</h3>
+    <p class="v111-meta">학생들의 현재 상태를 관리합니다.<br>ON일 때 바쁜 학생은 응답이 달라지거나 나중에 연락옵니다.</p>
+    <div class="v111-row">
+      <div class="desc">
+        <b>월드 스테이트</b>
+        <span>학생 상태 시스템 활성화</span>
+      </div>
+      <button type="button" class="v111-switch" id="v111-ws-toggle">OFF</button>
+    </div>
+    <div class="v111-row">
+      <div class="desc">
+        <b>자동 상태 변화</b>
+        <span>시간대에 따라 상태가 천천히 바뀝니다</span>
+      </div>
+      <button type="button" class="v111-switch" id="v111-ws-auto">OFF</button>
+    </div>
+    <label style="font-size:13px;font-weight:700;margin:12px 0 6px;display:block;">학생 현황</label>
+    <div class="v111-student-list" id="v111-ws-list"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button type="button" class="v111-btn gray" style="flex:1;" id="v111-ws-refresh">상태 새로고침</button>
+      <button type="button" class="v111-btn gray" style="flex:1;" id="v111-ws-close">닫기</button>
+    </div>
+  </div>
+</div>
+
+<div id="v111-ws-status-bar" aria-live="polite"></div>
+
+<script id="v111-world-state">
+/* v11.1: 살아있는 키보토스 — World State System (옵션) */
+(function () {
+  'use strict';
+  if (window.__PRANA_V111_WS__) return;
+  window.__PRANA_V111_WS__ = true;
+
+  var ENABLED_KEY = 'PRANA_V111_WS_ENABLED';
+  var AUTO_KEY = 'PRANA_V111_WS_AUTO';
+  var STATE_KEY = 'PRANA_V111_WS_STATES';
+  var PENDING_KEY = 'PRANA_V111_WS_PENDING';
+
+  var STATUSES = [
+    { id: 'available', label: '응답 가능', emoji: '🟢', weightDay: 40, weightNight: 15 },
+    { id: 'classroom', label: '수업 중', emoji: '📘', weightDay: 25, weightNight: 0 },
+    { id: 'outing', label: '외출 중', emoji: '🚶', weightDay: 15, weightNight: 10 },
+    { id: 'training', label: '훈련 중', emoji: '⚔️', weightDay: 12, weightNight: 5 },
+    { id: 'sleeping', label: '수면 중', emoji: '😴', weightDay: 3, weightNight: 55 },
+    { id: 'mission', label: '임무 중', emoji: '🚨', weightDay: 4, weightNight: 5 },
+    { id: 'unreachable', label: '연락 두절', emoji: '📵', weightDay: 1, weightNight: 10 }
+  ];
+
+  var STATUS_MAP = {};
+  STATUSES.forEach(function (s) { STATUS_MAP[s.id] = s; });
+
+  function sg(k) {
+    try { return (typeof safeGet === 'function') ? safeGet(k) : (localStorage.getItem(k) || ''); }
+    catch (e) { return ''; }
+  }
+  function ss(k, v) {
+    try { if (typeof safeSet === 'function') safeSet(k, v); else localStorage.setItem(k, String(v)); }
+    catch (e) {}
+  }
+  function loadJSON(k, fb) {
+    try {
+      var raw = sg(k);
+      if (!raw) return fb;
+      var v = JSON.parse(raw);
+      return v == null ? fb : v;
+    } catch (e) { return fb; }
+  }
+  function saveJSON(k, v) { ss(k, JSON.stringify(v)); }
+
+  function isEnabled() { return sg(ENABLED_KEY) === 'true'; }
+  function setEnabled(v) { ss(ENABLED_KEY, v ? 'true' : 'false'); updateUI(); }
+  function isAuto() { return sg(AUTO_KEY) === 'true'; }
+  function setAuto(v) { ss(AUTO_KEY, v ? 'true' : 'false'); updateUI(); }
+
+  function getStates() {
+    var o = loadJSON(STATE_KEY, {});
+    return (o && typeof o === 'object') ? o : {};
+  }
+  function saveStates(o) { saveJSON(STATE_KEY, o); }
+
+  function getPending() {
+    var o = loadJSON(PENDING_KEY, {});
+    return (o && typeof o === 'object') ? o : {};
+  }
+  function savePending(o) { saveJSON(PENDING_KEY, o); }
+
+  function personaName(id) {
+    try {
+      var P = (typeof PERSONAS !== 'undefined' ? PERSONAS : window.PERSONAS) || {};
+      return (P[id] && P[id].name) || id;
+    } catch (e) { return id; }
+  }
+  function personaAvatar(id) {
+    try {
+      var P = (typeof PERSONAS !== 'undefined' ? PERSONAS : window.PERSONAS) || {};
+      return (P[id] && P[id].avatar) || '👤';
+    } catch (e) { return '👤'; }
+  }
+  function isGroupOrHidden(id) {
+    try {
+      var P = (typeof PERSONAS !== 'undefined' ? PERSONAS : window.PERSONAS) || {};
+      var p = P[id];
+      if (!p) return true;
+      if (p.isGroup || p.noStudentSetting || p.noBond) return true;
+      // OS / special
+      if (id === 'prana' || id === 'arona' || id === 'norona' || id === 'sirena') return false;
+      return false;
+    } catch (e) { return false; }
+  }
+
+  function listStudentIds() {
+    var ids = [];
+    try {
+      var P = (typeof PERSONAS !== 'undefined' ? PERSONAS : window.PERSONAS) || {};
+      Object.keys(P).forEach(function (id) {
+        var p = P[id];
+        if (!p || p.isGroup || p.noStudentSetting) return;
+        ids.push(id);
+      });
+    } catch (e) {}
+    return ids;
+  }
+
+  function pickWeighted(isNight) {
+    var pool = [];
+    STATUSES.forEach(function (s) {
+      var w = isNight ? s.weightNight : s.weightDay;
+      for (var i = 0; i < w; i++) pool.push(s.id);
+    });
+    if (!pool.length) return 'available';
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function ensureStates() {
+    var states = getStates();
+    var ids = listStudentIds();
+    var hour = new Date().getHours();
+    var isNight = hour >= 22 || hour < 6;
+    var changed = false;
+    ids.forEach(function (id) {
+      if (!states[id] || !STATUS_MAP[states[id].status]) {
+        states[id] = {
+          status: pickWeighted(isNight),
+          since: Date.now(),
+          note: ''
+        };
+        changed = true;
+      }
+    });
+    if (changed) saveStates(states);
+    return states;
+  }
+
+  function getStatus(id) {
+    var states = ensureStates();
+    var st = states[id];
+    if (!st || !STATUS_MAP[st.status]) {
+      return { status: 'available', since: Date.now(), note: '' };
+    }
+    return st;
+  }
+
+  function setStatus(id, statusId, note) {
+    if (!STATUS_MAP[statusId]) return;
+    var states = getStates();
+    states[id] = {
+      status: statusId,
+      since: Date.now(),
+      note: note || ''
+    };
+    saveStates(states);
+    updateStatusBar();
+    renderList();
+  }
+
+  function autoTick() {
+    if (!isEnabled() || !isAuto()) return;
+    if (window.__pranaPageVisible === false) return;
+    var hour = new Date().getHours();
+    var isNight = hour >= 22 || hour < 6;
+    var states = ensureStates();
+    var ids = listStudentIds();
+    var changed = false;
+    ids.forEach(function (id) {
+      var st = states[id];
+      if (!st) return;
+      var ageMin = (Date.now() - (st.since || 0)) / 60000;
+      // 상태가 오래됐을 때만 확률적으로 변경
+      var chance = ageMin > 45 ? 0.35 : (ageMin > 20 ? 0.12 : 0.03);
+      if (Math.random() > chance) return;
+      var next = pickWeighted(isNight);
+      // 너무 극단적인 점프 완화
+      if (st.status === 'unreachable' && next === 'available' && Math.random() > 0.4) next = 'outing';
+      if (st.status === 'sleeping' && !isNight && Math.random() > 0.3) next = 'available';
+      if (next !== st.status) {
+        states[id] = { status: next, since: Date.now(), note: '' };
+        changed = true;
+      }
+    });
+    if (changed) {
+      saveStates(states);
+      updateStatusBar();
+      if (document.getElementById('v111-ws-modal') && document.getElementById('v111-ws-modal').classList.contains('open')) {
+        renderList();
+      }
+    }
+  }
+
+  /* ===== 프롬프트 / 응답 개입 ===== */
+  function statusPrompt(id) {
+    if (!isEnabled()) return '';
+    var st = getStatus(id);
+    var s = STATUS_MAP[st.status];
+    if (!s || st.status === 'available') return '';
+
+    var lines = [
+      '\n\n[🌍 월드 스테이트 — 현재 학생 상태]',
+      '이 학생의 현재 상태: ' + s.emoji + ' ' + s.label + (st.note ? ' (' + st.note + ')' : '')
+    ];
+
+    if (st.status === 'classroom') {
+      lines.push('- 지금은 수업/강의 중입니다. 짧게 답하거나, 수업 중이라 나중에 자세히 이야기하자고 할 수 있습니다.');
+      lines.push('- 선생님에게 폐를 끼치지 않으려 조용히, 하지만 캐릭터답게 반응하세요.');
+    } else if (st.status === 'outing') {
+      lines.push('- 외출 중입니다. 어디 있는지, 뭐 하고 있는지 가볍게 언급하며 답하세요.');
+      lines.push('- 지금 바로 만나기는 어렵고, 문자/통화로 대화하는 느낌으로 2~3문장.');
+    } else if (st.status === 'training') {
+      lines.push('- 훈련/연습 중입니다. 숨을 고르거나 땀을 닦는 등 행동 묘사를 소량 넣어도 됩니다.');
+      lines.push('- 훈련 때문에 답변이 조금 짧거나 집중이 분산된 느낌을 주세요.');
+    } else if (st.status === 'sleeping') {
+      lines.push('- 자고 있거나 막 잠에서 깬 상태입니다.');
+      lines.push('- 답이 느리거나, 졸린 말투, 다시 자겠다는 반응을 캐릭터답게 표현하세요. 억지로 길게 말하지 마세요.');
+    } else if (st.status === 'mission') {
+      lines.push('- 작전/임무 수행 중입니다. 긴장감 있는 짧은 보고 톤이 가능합니다.');
+      lines.push('- 자세한 위치나 내용은 보안상 말하기 어렵다고 할 수 있습니다.');
+    } else if (st.status === 'unreachable') {
+      lines.push('- 연락이 잘 닿지 않는 상태입니다.');
+      lines.push('- 응답이 없거나, 끊긴 통신, 나중에 다시 연락하겠다는 단편적인 메시지만 가능합니다. 길게 대화하지 마세요.');
+    }
+    lines.push('- 상태 설정은 롤플레이용입니다. 상태를 직접 "시스템 상태"라고 설명하지 말고 자연스럽게 행동/대사로 녹이세요.');
+    return lines.join('\n');
+  }
+
+  window.buildV111WorldStatePrompt = function (modeId, persona) {
+    try {
+      if (!isEnabled() || !modeId) return '';
+      if (persona && persona.isGroup) return '';
+      return statusPrompt(modeId);
+    } catch (e) { return ''; }
+  };
+
+  /* sendMessage 훅: 프롬프트 주입 + 연락 두절 시 시스템 메시지 */
+  function installSendHook() {
+    if (typeof window.sendMessage !== 'function') return;
+    if (window.sendMessage.__v111ws) return;
+
+    // 기존 가드가 있을 수 있으므로 가장 바깥을 한 번 더 감싼다
+    var prev = window.sendMessage;
+    var wrapped = async function () {
+      if (!isEnabled()) return prev.apply(this, arguments);
+
+      var mode = (typeof currentMode !== 'undefined') ? currentMode : null;
+      if (!mode) return prev.apply(this, arguments);
+
+      var st = getStatus(mode);
+      // 연락 두절이면 일정 확률로 실제 응답 대신 시스템 안내
+      if (st.status === 'unreachable' && Math.random() < 0.72) {
+        var input = document.getElementById('user-input');
+        var text = input ? input.value.trim() : '';
+        if (text && typeof appendMessage === 'function') {
+          if (input) input.value = '';
+          var sendBtn = document.getElementById('send-btn');
+          if (sendBtn) sendBtn.disabled = false;
+          appendMessage(
+            (typeof getUserDisplayName === 'function' ? getUserDisplayName() : '선생님'),
+            text,
+            false,
+            '',
+            null
+          );
+          setTimeout(function () {
+            appendMessage(
+              '시스템',
+              '📵 ' + personaName(mode) + ' 학생에게 연락이 닿지 않습니다. (상태: 연락 두절)\n잠시 후 다시 시도하거나, 다른 학생에게 물어보세요.',
+              true,
+              '시스템',
+              null,
+              { hideActions: true }
+            );
+          }, 400);
+          // 나중에 연락 올 수 있게 예약
+          scheduleCallback(mode, text);
+          return;
+        }
+      }
+      return prev.apply(this, arguments);
+    };
+    wrapped.__v111ws = true;
+    // 기존 __pranaModeGuard 등 플래그 유지
+    if (prev.__pranaModeGuard) wrapped.__pranaModeGuard = true;
+    window.sendMessage = wrapped;
+    try { sendMessage = wrapped; } catch (e) {}
+  }
+
+  function scheduleCallback(charId, lastUserText) {
+    var pending = getPending();
+    pending[charId] = {
+      at: Date.now() + (8 + Math.floor(Math.random() * 20)) * 60 * 1000, // 8~28분 후
+      preview: String(lastUserText || '').slice(0, 40),
+      created: Date.now()
+    };
+    savePending(pending);
+  }
+
+  function checkPendingCallbacks() {
+    if (!isEnabled()) return;
+    var pending = getPending();
+    var now = Date.now();
+    var states = getStates();
+    var changed = false;
+    Object.keys(pending).forEach(function (id) {
+      var p = pending[id];
+      if (!p || !p.at) return;
+      if (now < p.at) return;
+      // 상태가 연락 두절이면 available로 풀어주고 알림
+      if (states[id] && states[id].status === 'unreachable') {
+        states[id] = { status: 'available', since: now, note: '연락 회복' };
+        changed = true;
+      }
+      try {
+        if (typeof appendMessage === 'function' && (typeof currentMode === 'undefined' || currentMode === id)) {
+          appendMessage(
+            '시스템',
+            '📲 ' + personaName(id) + ' 학생에게서 연락이 왔습니다. 「' + (p.preview || '…') + '」에 대한 답인 것 같습니다.',
+            true,
+            '시스템',
+            null,
+            { hideActions: true }
+          );
+        }
+      } catch (e) {}
+      delete pending[id];
+    });
+    if (changed) saveStates(states);
+    savePending(pending);
+    updateStatusBar();
+  }
+
+  /* ===== UI ===== */
+  function updateUI() {
+    var t1 = document.getElementById('v111-ws-toggle');
+    var t2 = document.getElementById('v111-ws-auto');
+    if (t1) {
+      t1.textContent = isEnabled() ? 'ON' : 'OFF';
+      t1.classList.toggle('on', isEnabled());
+    }
+    if (t2) {
+      t2.textContent = isAuto() ? 'ON' : 'OFF';
+      t2.classList.toggle('on', isAuto());
+    }
+    updateStatusBar();
+  }
+
+  function updateStatusBar() {
+    var bar = document.getElementById('v111-ws-status-bar');
+    if (!bar) return;
+    if (!isEnabled()) {
+      bar.classList.remove('show');
+      bar.textContent = '';
+      return;
+    }
+    var mode = (typeof currentMode !== 'undefined') ? currentMode : null;
+    if (!mode) {
+      bar.classList.remove('show');
+      return;
+    }
+    var st = getStatus(mode);
+    var s = STATUS_MAP[st.status] || STATUS_MAP.available;
+    bar.innerHTML = '<strong>월드 스테이트</strong> · ' + personaName(mode) + ' — ' +
+      '<span class="v111-badge ' + st.status + '">' + s.emoji + ' ' + s.label + '</span>';
+    bar.classList.add('show');
+  }
+
+  function renderList() {
+    var list = document.getElementById('v111-ws-list');
+    if (!list) return;
+    list.innerHTML = '';
+    var ids = listStudentIds();
+    var states = ensureStates();
+    if (!ids.length) {
+      list.innerHTML = '<p style="font-size:12px;color:#8a9bb0;text-align:center;padding:12px;">학생 목록을 불러오는 중입니다.</p>';
+      return;
+    }
+    ids.forEach(function (id) {
+      var st = states[id] || { status: 'available' };
+      var s = STATUS_MAP[st.status] || STATUS_MAP.available;
+      var item = document.createElement('div');
+      item.className = 'v111-student-item';
+      var av = document.createElement('span');
+      av.className = 'av';
+      av.textContent = personaAvatar(id);
+      var nm = document.createElement('div');
+      nm.className = 'nm';
+      nm.innerHTML = '<b>' + personaName(id) + '</b><span>' + s.emoji + ' ' + s.label + '</span>';
+      var sel = document.createElement('select');
+      sel.className = 'v111-status-select';
+      STATUSES.forEach(function (opt) {
+        var o = document.createElement('option');
+        o.value = opt.id;
+        o.textContent = opt.emoji + ' ' + opt.label;
+        if (opt.id === st.status) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.onchange = function () {
+        setStatus(id, sel.value);
+      };
+      item.appendChild(av);
+      item.appendChild(nm);
+      item.appendChild(sel);
+      list.appendChild(item);
+    });
+  }
+
+  function openModal() {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    var m = document.getElementById('v111-ws-modal');
+    if (!m) return;
+    ensureStates();
+    renderList();
+    updateUI();
+    m.classList.add('open');
+    m.style.display = 'flex';
+  }
+  function closeModal() {
+    var m = document.getElementById('v111-ws-modal');
+    if (m) {
+      m.classList.remove('open');
+      m.style.display = 'none';
+    }
+  }
+  window.openV111WorldState = openModal;
+  window.closeV111WorldState = closeModal;
+
+  function injectMenu() {
+    var list = document.querySelector('#main-menu-modal .menu-list') ||
+               (typeof window.__pranaGetMenuList === 'function' ? window.__pranaGetMenuList() : null);
+    if (!list) return;
+    if (document.getElementById('menu-v111-ws')) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'menu-v111-ws';
+    btn.className = 'menu-item-btn';
+    btn.setAttribute('data-search', '월드 스테이트 키보토스 상태 학생 현황 world state living');
+    btn.textContent = '🌍 살아있는 키보토스';
+    btn.onclick = openModal;
+    // 대화·기능 모드 버튼 근처에
+    var modesBtn = document.getElementById('menu-prana-modes');
+    if (modesBtn && modesBtn.parentNode === list) {
+      list.insertBefore(btn, modesBtn.nextSibling);
+    } else {
+      list.insertBefore(btn, list.firstChild);
+    }
+  }
+
+  /* sendMessage 쪽 systemInstruction에 프롬프트 붙이기 — 기존 패턴 따라 전역 함수로 노출됨
+     실제 주입 지점에 한 줄 추가가 이상적이나, 안전하게 Mutation/폴링 대신
+     buildV95 등과 같이 sendMessage 내부의 try 블록 패턴을 흉내내기 위해
+     아래 훅으로 conversation 직전 프롬프트를 보강한다. */
+
+  function tryInjectIntoSendPipeline() {
+    // sendMessage 소스에 이미 여러 buildVxx 가 있으므로,
+    // 전역 buildV111WorldStatePrompt 를 기존 패턴과 동일하게 호출하도록
+    // sendMessage를 한 번 래핑할 때 프롬프트 빌드 후처리를 넣기는 어려움 (내부 변수).
+    // 대신 이미 있는 intelligence / memory 패턴처럼
+    // 사용자가 보낸 직후 systemInstruction 조립부에 우리가 노출한 함수가 호출되도록
+    // 아래 보조 훅을 사용한다.
+    if (window.__v111PromptHooked) return;
+    window.__v111PromptHooked = true;
+
+    // 가장 안전한 방법: 기존 buildV95SchedulePrompt 옆에 호출되도록
+    // sendMessage 함수 텍스트를 건드리지 않고, PERSONAS prompt에 런타임으로 붙이는 방식은
+    // 부작용이 커서, append 시점에 시스템 메시지를 보조로 띄우고
+    // Gemini 호출 전 프롬프트는 buildV111 을 window에 올려두고
+    // 사용자가 이미 쓰는 v9x/v10x 확장 포인트가 있으면 거기로 연결.
+    // 여기서는 sendMessage 래퍼에서 unreachable만 처리하고,
+    // 일반 상태는 buildV111WorldStatePrompt를 기존 확장 슬롯에 연결 시도.
+    var origBuildMem = window.buildV91MemoryPrompt;
+    if (typeof origBuildMem === 'function' && !origBuildMem.__v111) {
+      window.buildV91MemoryPrompt = function (modeId, persona) {
+        var base = '';
+        try { base = origBuildMem.apply(this, arguments) || ''; } catch (e) {}
+        try { base += (window.buildV111WorldStatePrompt(modeId, persona) || ''); } catch (e2) {}
+        return base;
+      };
+      window.buildV91MemoryPrompt.__v111 = true;
+    } else if (!window.buildV91MemoryPrompt) {
+      // 메모리 모듈이 없으면 schedule 쪽에 붙임
+      var origSched = window.buildV95SchedulePrompt;
+      if (typeof origSched === 'function' && !origSched.__v111) {
+        window.buildV95SchedulePrompt = function (modeId, persona) {
+          var base = '';
+          try { base = origSched.apply(this, arguments) || ''; } catch (e) {}
+          try { base += (window.buildV111WorldStatePrompt(modeId, persona) || ''); } catch (e2) {}
+          return base;
+        };
+        window.buildV95SchedulePrompt.__v111 = true;
+      }
+    }
+  }
+
+  function placeStatusBar() {
+    var bar = document.getElementById('v111-ws-status-bar');
+    var chat = document.getElementById('chat-container');
+    if (!bar || !chat || bar.__placed) return;
+    // 채팅 컨테이너 위에 삽입
+    if (chat.parentNode) {
+      chat.parentNode.insertBefore(bar, chat);
+      bar.__placed = true;
+    }
+  }
+
+  function boot() {
+    ensureStates();
+    placeStatusBar();
+    injectMenu();
+    installSendHook();
+    tryInjectIntoSendPipeline();
+    updateUI();
+
+    var modal = document.getElementById('v111-ws-modal');
+    if (modal && !modal.__wired) {
+      modal.__wired = true;
+      modal.addEventListener('click', function (ev) {
+        if (ev.target === modal) closeModal();
+      });
+    }
+    var toggle = document.getElementById('v111-ws-toggle');
+    if (toggle) toggle.onclick = function () { setEnabled(!isEnabled()); };
+    var autoBtn = document.getElementById('v111-ws-auto');
+    if (autoBtn) autoBtn.onclick = function () { setAuto(!isAuto()); };
+    var closeBtn = document.getElementById('v111-ws-close');
+    if (closeBtn) closeBtn.onclick = closeModal;
+    var refreshBtn = document.getElementById('v111-ws-refresh');
+    if (refreshBtn) refreshBtn.onclick = function () {
+      // 강제 리롤 (수동)
+      var states = getStates();
+      var hour = new Date().getHours();
+      var isNight = hour >= 22 || hour < 6;
+      listStudentIds().forEach(function (id) {
+        states[id] = { status: pickWeighted(isNight), since: Date.now(), note: '' };
+      });
+      saveStates(states);
+      renderList();
+      updateStatusBar();
+    };
+
+    // 주기 작업
+    setInterval(function () {
+      injectMenu();
+      installSendHook();
+      tryInjectIntoSendPipeline();
+      placeStatusBar();
+      updateStatusBar();
+    }, 6000);
+    setInterval(autoTick, 3 * 60 * 1000);       // 3분마다 상태 틱
+    setInterval(checkPendingCallbacks, 60 * 1000); // 1분마다 예약 연락 체크
+
+    // 모드 전환 시 상태바 갱신
+    var lastMode = null;
+    setInterval(function () {
+      try {
+        if (typeof currentMode !== 'undefined' && currentMode !== lastMode) {
+          lastMode = currentMode;
+          updateStatusBar();
+        }
+      } catch (e) {}
+    }, 800);
+
+    console.log('[PRANA] v11.1 World State (살아있는 키보토스) ready');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+
+
+<style id="v112-settings-style">
+#v112-settings-modal{display:none;position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.8);align-items:center;justify-content:center;padding:12px;box-sizing:border-box}
+#v112-settings-modal.open{display:flex!important}
+#v112-settings-modal .v112-box{background:var(--card-bg,#151a24);border:1px solid var(--border-color,#2a3447);border-radius:14px;width:100%;max-width:440px;max-height:90vh;display:flex;flex-direction:column;color:var(--text-color,#e0e6ed);overflow:hidden}
+#v112-settings-modal .v112-head{padding:14px 16px 8px;flex-shrink:0;text-align:center}
+#v112-settings-modal .v112-head h3{margin:0 0 4px;font-size:16px}
+#v112-settings-modal .v112-head p{margin:0;font-size:11px;color:#8a9bb0;line-height:1.4}
+.v112-tabs{display:flex;flex-wrap:wrap;gap:5px;padding:8px 12px;border-bottom:1px solid var(--border-color);flex-shrink:0}
+.v112-tab{flex:1;min-width:56px;padding:7px 4px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-color);color:var(--text-color);font-size:11px;font-weight:700;cursor:pointer}
+.v112-tab.on{border-color:var(--accent-color,#8a2be2);background:var(--accent-color,#8a2be2);color:#fff}
+.v112-body{flex:1;overflow-y:auto;padding:12px 14px 16px;-webkit-overflow-scrolling:touch}
+.v112-sec{margin-bottom:14px}
+.v112-sec-title{font-size:12px;font-weight:700;color:var(--accent-color);margin:0 0 8px;letter-spacing:.02em}
+.v112-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:10px;margin-bottom:7px}
+.v112-row .desc{min-width:0;flex:1}
+.v112-row .desc b{display:block;font-size:13px;margin-bottom:2px}
+.v112-row .desc span{display:block;font-size:11px;color:#8a9bb0;line-height:1.35}
+.v112-switch{min-width:52px;padding:6px 10px;border:1px solid var(--border-color);border-radius:999px;background:#334155;color:#fff;font-weight:700;font-size:12px;cursor:pointer}
+.v112-switch.on{background:var(--accent-color,#8a2be2);border-color:#b19ffb}
+.v112-select{padding:6px 8px;border-radius:7px;border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);font-size:12px;max-width:130px}
+.v112-range{width:100%;accent-color:var(--accent-color,#8a2be2)}
+.v112-btn{width:100%;padding:10px;border:none;border-radius:8px;background:var(--accent-color,#8a2be2);color:#fff;font-weight:700;cursor:pointer;font-size:13px;margin-top:6px}
+.v112-btn.gray{background:#334155}
+.v112-btn.danger{background:#b91c1c}
+.v112-btn.small{width:auto;padding:7px 12px;font-size:12px;margin-top:0}
+.v112-preset{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.v112-preset button{flex:1;min-width:70px;padding:8px 6px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-color);color:var(--text-color);font-size:11px;font-weight:700;cursor:pointer}
+.v112-preset button:active{border-color:var(--accent-color)}
+.v112-hint{font-size:11px;color:#8a9bb0;line-height:1.45;margin:6px 0 10px}
+.v112-foot{padding:10px 14px;border-top:1px solid var(--border-color);flex-shrink:0}
+body.v112-focus-mode header .header-actions,
+body.v112-focus-mode .mention-bar{opacity:.35;transition:opacity .25s}
+body.v112-focus-mode header .header-actions:hover,
+body.v112-focus-mode .mention-bar:hover{opacity:1}
+body.v112-large-text #chat-container .message{font-size:16px!important;line-height:1.6!important}
+body.v112-high-contrast{--border-color:#64748b!important}
+body.v112-reduce-motion *{animation-duration:.01ms!important;transition-duration:.01ms!important}
+body.v112-hide-avatar .avatar-wrap{display:none!important}
+#chat-container.v112-font-sm .message{font-size:13px}
+#chat-container.v112-font-md .message{font-size:14px}
+#chat-container.v112-font-lg .message{font-size:16px}
+#chat-container.v112-gap-tight{gap:8px}
+#chat-container.v112-gap-normal{gap:12px}
+#chat-container.v112-gap-wide{gap:18px}
+</style>
+
+<div id="v112-settings-modal">
+  <div class="v112-box">
+    <div class="v112-head">
+      <h3>⚙️ 설정 허브</h3>
+      <p>대화 · 화면 · 알림 · 데이터 옵션을 한곳에서 관리합니다</p>
+    </div>
+    <div class="v112-tabs" id="v112-tabs">
+      <button type="button" class="v112-tab on" data-tab="general">일반</button>
+      <button type="button" class="v112-tab" data-tab="chat">대화</button>
+      <button type="button" class="v112-tab" data-tab="display">화면</button>
+      <button type="button" class="v112-tab" data-tab="notify">알림</button>
+      <button type="button" class="v112-tab" data-tab="data">데이터</button>
+      <button type="button" class="v112-tab" data-tab="a11y">접근성</button>
+    </div>
+    <div class="v112-body" id="v112-body"></div>
+    <div class="v112-foot">
+      <button type="button" class="v112-btn gray" id="v112-close">닫기</button>
+    </div>
+  </div>
+</div>
+
+<script id="v112-settings-hub">
+/* v11.2: 통합 설정 허브 — Options Hub */
+(function () {
+  'use strict';
+  if (window.__PRANA_V112__) return;
+  window.__PRANA_V112__ = true;
+
+  var KEY = 'PRANA_V112_SETTINGS';
+
+  var DEFAULTS = {
+    // general
+    preset: 'default',
+    // chat
+    replyLength: 'normal',      // short | normal | long
+    actionFreq: 'normal',       // low | normal | high
+    honorific: 'free',          // force | free
+    emojiLevel: 'normal',       // low | normal | high
+    memoryStrength: 'normal',   // short | normal | deep
+    callName: '선생님',
+    // display
+    fontSize: 'md',             // sm | md | lg
+    msgGap: 'normal',           // tight | normal | wide
+    showAvatar: true,
+    statusBar: true,
+    focusMode: false,
+    // notify
+    seasonNotify: true,
+    unreachableNotify: true,
+    weatherNotify: false,
+    dndEnabled: false,
+    dndStart: '23',
+    dndEnd: '7',
+    // a11y
+    largeText: false,
+    highContrast: false,
+    reduceMotion: false,
+    haptics: false
+  };
+
+  function sg(k) {
+    try { return (typeof safeGet === 'function') ? safeGet(k) : (localStorage.getItem(k) || ''); }
+    catch (e) { return ''; }
+  }
+  function ss(k, v) {
+    try { if (typeof safeSet === 'function') safeSet(k, v); else localStorage.setItem(k, String(v)); }
+    catch (e) {}
+  }
+
+  function load() {
+    try {
+      var raw = sg(KEY);
+      if (!raw) return Object.assign({}, DEFAULTS);
+      var o = JSON.parse(raw);
+      return Object.assign({}, DEFAULTS, o || {});
+    } catch (e) { return Object.assign({}, DEFAULTS); }
+  }
+  function save(cfg) { ss(KEY, JSON.stringify(cfg)); }
+
+  var cfg = load();
+
+  function set(key, val) {
+    cfg[key] = val;
+    save(cfg);
+    applyAll();
+    renderBody(currentTab);
+  }
+  function get(key) { return cfg[key]; }
+
+  window.PRANA_SETTINGS = {
+    get: function (k) { return get(k); },
+    set: function (k, v) { set(k, v); },
+    all: function () { return Object.assign({}, cfg); },
+    reload: function () { cfg = load(); applyAll(); }
+  };
+
+  /* ===== Apply visual / behavior ===== */
+  function applyAll() {
+    var body = document.body;
+    var chat = document.getElementById('chat-container');
+
+    body.classList.toggle('v112-focus-mode', !!cfg.focusMode);
+    body.classList.toggle('v112-large-text', !!cfg.largeText);
+    body.classList.toggle('v112-high-contrast', !!cfg.highContrast);
+    body.classList.toggle('v112-reduce-motion', !!cfg.reduceMotion);
+    body.classList.toggle('v112-hide-avatar', !cfg.showAvatar);
+
+    if (chat) {
+      chat.classList.remove('v112-font-sm', 'v112-font-md', 'v112-font-lg', 'v112-gap-tight', 'v112-gap-normal', 'v112-gap-wide');
+      chat.classList.add('v112-font-' + (cfg.fontSize || 'md'));
+      chat.classList.add('v112-gap-' + (cfg.msgGap || 'normal'));
+    }
+
+    // status bar visibility (world state bar)
+    var wsBar = document.getElementById('v111-ws-status-bar');
+    if (wsBar) {
+      if (!cfg.statusBar) wsBar.style.display = 'none';
+      else wsBar.style.display = '';
+    }
+
+    // expose for other modules
+    window.__pranaDndActive = isDndNow();
+  }
+
+  function isDndNow() {
+    if (!cfg.dndEnabled) return false;
+    var h = new Date().getHours();
+    var s = Number(cfg.dndStart) || 23;
+    var e = Number(cfg.dndEnd) || 7;
+    if (s === e) return true;
+    if (s < e) return h >= s && h < e;
+    return h >= s || h < e; // overnight
+  }
+
+  /* ===== Prompt builder for chat options ===== */
+  window.buildV112ChatOptionsPrompt = function (modeId, persona) {
+    try {
+      var parts = ['\n\n[⚙️ 선생님 대화 옵션]'];
+      var len = cfg.replyLength || 'normal';
+      if (len === 'short') parts.push('- 답변은 1~2문장으로 짧게 유지하세요.');
+      else if (len === 'long') parts.push('- 답변은 3~5문장으로 조금 더 자세히 작성하세요.');
+      else parts.push('- 답변은 2~3문장 분량으로 작성하세요.');
+
+      var act = cfg.actionFreq || 'normal';
+      if (act === 'low') parts.push('- 행동 묘사(소괄호)는 거의 사용하지 마세요.');
+      else if (act === 'high') parts.push('- 행동 묘사(소괄호)를 자연스럽게 1~2개 포함하세요.');
+      else parts.push('- 행동 묘사는 필요할 때만 0~1개 사용하세요.');
+
+      if (cfg.honorific === 'force') {
+        parts.push('- 유저를 반드시 「' + (cfg.callName || '선생님') + '」으로 부르세요.');
+      }
+
+      var emo = cfg.emojiLevel || 'normal';
+      if (emo === 'low') parts.push('- 이모지·과도한 감탄사는 최소화하세요.');
+      else if (emo === 'high') parts.push('- 캐릭터에 맞게 이모지·감탄사를 적극 활용해도 됩니다.');
+
+      var mem = cfg.memoryStrength || 'normal';
+      if (mem === 'short') parts.push('- 아주 최근 대화만 가볍게 참고하세요.');
+      else if (mem === 'deep') parts.push('- 이전 대화·관계·사건을 적극 반영하여 연속성 있게 답하세요.');
+
+      return parts.join('\n');
+    } catch (e) { return ''; }
+  };
+
+  /* hook into memory/schedule prompt chain like v111 */
+  function installPromptHook() {
+    if (window.buildV112ChatOptionsPrompt.__hooked) return;
+    var targets = ['buildV91MemoryPrompt', 'buildV95SchedulePrompt', 'buildV104IntelligencePrompt'];
+    var hooked = false;
+    targets.forEach(function (name) {
+      var orig = window[name];
+      if (typeof orig === 'function' && !orig.__v112) {
+        window[name] = function () {
+          var base = '';
+          try { base = orig.apply(this, arguments) || ''; } catch (e) {}
+          try { base += (window.buildV112ChatOptionsPrompt.apply(this, arguments) || ''); } catch (e2) {}
+          return base;
+        };
+        window[name].__v112 = true;
+        hooked = true;
+      }
+    });
+    if (!hooked && !window.buildV91MemoryPrompt) {
+      window.buildV91MemoryPrompt = function (modeId, persona) {
+        return window.buildV112ChatOptionsPrompt(modeId, persona) || '';
+      };
+    }
+    window.buildV112ChatOptionsPrompt.__hooked = true;
+  }
+
+  /* ===== UI ===== */
+  var currentTab = 'general';
+
+  function el(tag, cls, html) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html != null) e.innerHTML = html;
+    return e;
+  }
+
+  function switchRow(title, desc, key) {
+    var row = el('div', 'v112-row');
+    var d = el('div', 'desc');
+    d.innerHTML = '<b>' + title + '</b><span>' + desc + '</span>';
+    var btn = el('button', 'v112-switch' + (cfg[key] ? ' on' : ''));
+    btn.type = 'button';
+    btn.textContent = cfg[key] ? 'ON' : 'OFF';
+    btn.onclick = function () { set(key, !cfg[key]); };
+    row.appendChild(d);
+    row.appendChild(btn);
+    return row;
+  }
+
+  function selectRow(title, desc, key, options) {
+    var row = el('div', 'v112-row');
+    var d = el('div', 'desc');
+    d.innerHTML = '<b>' + title + '</b><span>' + desc + '</span>';
+    var sel = el('select', 'v112-select');
+    options.forEach(function (o) {
+      var opt = document.createElement('option');
+      opt.value = o.v;
+      opt.textContent = o.t;
+      if (cfg[key] === o.v) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.onchange = function () { set(key, sel.value); };
+    row.appendChild(d);
+    row.appendChild(sel);
+    return row;
+  }
+
+  function renderBody(tab) {
+    currentTab = tab || currentTab;
+    var body = document.getElementById('v112-body');
+    if (!body) return;
+    body.innerHTML = '';
+
+    // tab highlight
+    var tabs = document.querySelectorAll('#v112-tabs .v112-tab');
+    tabs.forEach(function (t) {
+      t.classList.toggle('on', t.getAttribute('data-tab') === currentTab);
+    });
+
+    if (currentTab === 'general') {
+      body.appendChild(el('div', 'v112-sec-title', '빠른 프리셋'));
+      var preset = el('div', 'v112-preset');
+      [
+        { id: 'default', label: '기본' },
+        { id: 'immerse', label: '몰입' },
+        { id: 'lite', label: '라이트' },
+        { id: 'power', label: '절전' }
+      ].forEach(function (p) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = p.label;
+        b.onclick = function () { applyPreset(p.id); };
+        preset.appendChild(b);
+      });
+      body.appendChild(preset);
+      body.appendChild(el('p', 'v112-hint', '프리셋은 여러 옵션을 한 번에 맞춥니다. 이후 개별 조정도 가능합니다.'));
+
+      body.appendChild(el('div', 'v112-sec-title', '바로가기'));
+      var links = el('div', 'v112-sec');
+      var btn1 = el('button', 'v112-btn small', '🌍 월드 스테이트 설정');
+      btn1.style.marginRight = '6px';
+      btn1.onclick = function () {
+        closeModal();
+        if (typeof window.openV111WorldState === 'function') window.openV111WorldState();
+      };
+      var btn2 = el('button', 'v112-btn small gray', '🛡️ 대화·기능 모드');
+      btn2.onclick = function () {
+        closeModal();
+        if (typeof window.openPranaModesModal === 'function') window.openPranaModesModal();
+      };
+      links.appendChild(btn1);
+      links.appendChild(btn2);
+      body.appendChild(links);
+    }
+
+    if (currentTab === 'chat') {
+      body.appendChild(el('div', 'v112-sec-title', '답변 스타일'));
+      body.appendChild(selectRow('답변 길이', 'AI 응답 문장 수', 'replyLength', [
+        { v: 'short', t: '짧게' }, { v: 'normal', t: '보통' }, { v: 'long', t: '길게' }
+      ]));
+      body.appendChild(selectRow('행동 묘사', '소괄호 행동문 빈도', 'actionFreq', [
+        { v: 'low', t: '거의 없음' }, { v: 'normal', t: '보통' }, { v: 'high', t: '자주' }
+      ]));
+      body.appendChild(selectRow('이모지·감탄', '이모지/감탄사 허용', 'emojiLevel', [
+        { v: 'low', t: '적게' }, { v: 'normal', t: '보통' }, { v: 'high', t: '많이' }
+      ]));
+      body.appendChild(selectRow('기억 강도', '이전 대화 반영 정도', 'memoryStrength', [
+        { v: 'short', t: '짧게' }, { v: 'normal', t: '보통' }, { v: 'deep', t: '깊게' }
+      ]));
+      body.appendChild(selectRow('호칭 강제', '「선생님」 등 호칭', 'honorific', [
+        { v: 'free', t: '자유' }, { v: 'force', t: '강제' }
+      ]));
+
+      var nameRow = el('div', 'v112-row');
+      var nd = el('div', 'desc');
+      nd.innerHTML = '<b>호칭 텍스트</b><span>강제 모드에서 사용할 호칭</span>';
+      var inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = cfg.callName || '선생님';
+      inp.style.cssText = 'width:110px;padding:6px 8px;border-radius:7px;border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);font-size:12px';
+      inp.onchange = function () { set('callName', inp.value.trim() || '선생님'); };
+      nameRow.appendChild(nd);
+      nameRow.appendChild(inp);
+      body.appendChild(nameRow);
+      body.appendChild(el('p', 'v112-hint', '이 옵션들은 다음 메시지부터 시스템 프롬프트에 반영됩니다.'));
+    }
+
+    if (currentTab === 'display') {
+      body.appendChild(el('div', 'v112-sec-title', '가독성'));
+      body.appendChild(selectRow('글자 크기', '채팅 메시지 크기', 'fontSize', [
+        { v: 'sm', t: '작게' }, { v: 'md', t: '보통' }, { v: 'lg', t: '크게' }
+      ]));
+      body.appendChild(selectRow('메시지 간격', '말풍선 사이 여백', 'msgGap', [
+        { v: 'tight', t: '좁게' }, { v: 'normal', t: '보통' }, { v: 'wide', t: '넓게' }
+      ]));
+      body.appendChild(switchRow('아바타 표시', '헤더 아바타 보이기', 'showAvatar'));
+      body.appendChild(switchRow('상태 바', '월드 스테이트 등 상태 표시', 'statusBar'));
+      body.appendChild(switchRow('집중 모드', '헤더·멘션바를 흐리게', 'focusMode'));
+    }
+
+    if (currentTab === 'notify') {
+      body.appendChild(el('div', 'v112-sec-title', '알림'));
+      body.appendChild(switchRow('시즌 알림', '미션·패스 관련 안내', 'seasonNotify'));
+      body.appendChild(switchRow('연락 복구 알림', '연락 두절 후 복구 시', 'unreachableNotify'));
+      body.appendChild(switchRow('날씨 알림', '날씨 효과 변경 시', 'weatherNotify'));
+      body.appendChild(el('div', 'v112-sec-title', '방해 금지'));
+      body.appendChild(switchRow('방해 금지 사용', '설정한 시간대에 자동 개입 최소화', 'dndEnabled'));
+      body.appendChild(selectRow('시작 시각', '방해 금지 시작 (시)', 'dndStart',
+        Array.from({ length: 24 }, function (_, i) { return { v: String(i), t: i + '시' }; })
+      ));
+      body.appendChild(selectRow('종료 시각', '방해 금지 종료 (시)', 'dndEnd',
+        Array.from({ length: 24 }, function (_, i) { return { v: String(i), t: i + '시' }; })
+      ));
+      body.appendChild(el('p', 'v112-hint', '방해 금지 시간에는 일부 자동 알림·개입이 줄어듭니다.'));
+    }
+
+    if (currentTab === 'data') {
+      body.appendChild(el('div', 'v112-sec-title', '백업 · 복원'));
+      body.appendChild(el('p', 'v112-hint', '설정·일부 진행도·커스텀 관련 키를 JSON으로 내보내고 가져옵니다. (대화 로그 전체는 용량 때문에 선택 포함)'));
+
+      var expBtn = el('button', 'v112-btn', '📤 설정 백업 내보내기');
+      expBtn.onclick = exportBackup;
+      body.appendChild(expBtn);
+
+      var impLabel = el('button', 'v112-btn gray', '📥 백업 파일로 복원');
+      impLabel.onclick = function () {
+        var inp = document.createElement('input');
+        inp.type = 'file';
+        inp.accept = 'application/json,.json';
+        inp.onchange = function () {
+          if (!inp.files || !inp.files[0]) return;
+          var reader = new FileReader();
+          reader.onload = function () {
+            try {
+              importBackup(String(reader.result || ''));
+              alert('복원이 완료되었습니다. 페이지를 새로고침하면 더 안정적으로 적용됩니다.');
+            } catch (e) {
+              alert('복원 실패: ' + (e.message || e));
+            }
+          };
+          reader.readAsText(inp.files[0]);
+        };
+        inp.click();
+      };
+      body.appendChild(impLabel);
+
+      body.appendChild(el('div', 'v112-sec-title', '초기화'));
+      var resetSet = el('button', 'v112-btn gray', '설정만 기본값으로');
+      resetSet.onclick = function () {
+        if (!confirm('설정 허브 옵션만 기본값으로 되돌릴까요?')) return;
+        cfg = Object.assign({}, DEFAULTS);
+        save(cfg);
+        applyAll();
+        renderBody('data');
+      };
+      body.appendChild(resetSet);
+    }
+
+    if (currentTab === 'a11y') {
+      body.appendChild(el('div', 'v112-sec-title', '접근성'));
+      body.appendChild(switchRow('큰 글씨', '메시지 글자 크기 확대', 'largeText'));
+      body.appendChild(switchRow('고대비', '테두리·구분선 강조', 'highContrast'));
+      body.appendChild(switchRow('애니메이션 줄이기', '전환·파티클 최소화', 'reduceMotion'));
+      body.appendChild(switchRow('햅틱 피드백', '지원 기기에서 진동 (실험)', 'haptics'));
+      body.appendChild(el('p', 'v112-hint', '성능이 낮거나 멀미가 있다면 「애니메이션 줄이기」를 권장합니다.'));
+    }
+  }
+
+  function applyPreset(id) {
+    if (id === 'immerse') {
+      Object.assign(cfg, {
+        preset: 'immerse',
+        replyLength: 'long',
+        actionFreq: 'high',
+        memoryStrength: 'deep',
+        emojiLevel: 'normal',
+        focusMode: true,
+        statusBar: true,
+        fontSize: 'md',
+        msgGap: 'normal',
+        reduceMotion: false
+      });
+    } else if (id === 'lite') {
+      Object.assign(cfg, {
+        preset: 'lite',
+        replyLength: 'short',
+        actionFreq: 'low',
+        memoryStrength: 'short',
+        emojiLevel: 'low',
+        focusMode: false,
+        statusBar: false,
+        fontSize: 'sm',
+        msgGap: 'tight',
+        reduceMotion: true
+      });
+    } else if (id === 'power') {
+      Object.assign(cfg, {
+        preset: 'power',
+        replyLength: 'short',
+        actionFreq: 'low',
+        memoryStrength: 'short',
+        focusMode: false,
+        statusBar: false,
+        reduceMotion: true,
+        showAvatar: true,
+        dndEnabled: false
+      });
+    } else {
+      Object.assign(cfg, Object.assign({}, DEFAULTS));
+      cfg.preset = 'default';
+    }
+    save(cfg);
+    applyAll();
+    renderBody('general');
+  }
+
+  /* backup */
+  function collectBackup() {
+    var keys = [];
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k) continue;
+        if (/^PRANA_/.test(k) || /^v10|^V10/.test(k)) keys.push(k);
+      }
+    } catch (e) {}
+    var data = {};
+    keys.forEach(function (k) {
+      try { data[k] = localStorage.getItem(k); } catch (e) {}
+    });
+    return {
+      app: 'kibotos-chat-os',
+      version: 'v11.2-settings',
+      exportedAt: new Date().toISOString(),
+      data: data
+    };
+  }
+
+  function exportBackup() {
+    try {
+      var blob = new Blob([JSON.stringify(collectBackup(), null, 2)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'kibotos-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 500);
+    } catch (e) {
+      alert('내보내기 실패: ' + (e.message || e));
+    }
+  }
+
+  function importBackup(text) {
+    var obj = JSON.parse(text);
+    if (!obj || !obj.data || typeof obj.data !== 'object') throw new Error('올바른 백업 형식이 아닙니다.');
+    Object.keys(obj.data).forEach(function (k) {
+      try { localStorage.setItem(k, obj.data[k]); } catch (e) {}
+    });
+    cfg = load();
+    applyAll();
+  }
+
+  function openModal(tab) {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    var m = document.getElementById('v112-settings-modal');
+    if (!m) return;
+    renderBody(tab || currentTab || 'general');
+    m.classList.add('open');
+    m.style.display = 'flex';
+  }
+  function closeModal() {
+    var m = document.getElementById('v112-settings-modal');
+    if (m) {
+      m.classList.remove('open');
+      m.style.display = 'none';
+    }
+  }
+  window.openV112Settings = openModal;
+  window.closeV112Settings = closeModal;
+
+  function injectMenu() {
+    var list = document.querySelector('#main-menu-modal .menu-list') ||
+      (typeof window.__pranaGetMenuList === 'function' ? window.__pranaGetMenuList() : null);
+    if (!list || document.getElementById('menu-v112-settings')) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'menu-v112-settings';
+    btn.className = 'menu-item-btn';
+    btn.setAttribute('data-search', '설정 옵션 허브 settings options 환경설정');
+    btn.textContent = '⚙️ 설정 허브';
+    btn.onclick = function () { openModal('general'); };
+    list.insertBefore(btn, list.firstChild);
+  }
+
+  function boot() {
+    applyAll();
+    installPromptHook();
+    injectMenu();
+
+    var modal = document.getElementById('v112-settings-modal');
+    if (modal && !modal.__wired) {
+      modal.__wired = true;
+      modal.addEventListener('click', function (ev) {
+        if (ev.target === modal) closeModal();
+      });
+    }
+    var closeBtn = document.getElementById('v112-close');
+    if (closeBtn) closeBtn.onclick = closeModal;
+
+    var tabs = document.getElementById('v112-tabs');
+    if (tabs) {
+      tabs.addEventListener('click', function (ev) {
+        var t = ev.target;
+        if (!t || !t.classList.contains('v112-tab')) return;
+        renderBody(t.getAttribute('data-tab'));
+      });
+    }
+
+    setInterval(function () {
+      injectMenu();
+      installPromptHook();
+      applyAll();
+    }, 7000);
+
+    console.log('[PRANA] v11.2 Settings Hub ready');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+
 </html>
