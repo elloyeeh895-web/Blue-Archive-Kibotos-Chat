@@ -22161,4 +22161,970 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
 })();
 </script>
 
+<style id="v113-style">
+#v113-img-btn{border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);border-radius:8px;padding:0 12px;font-size:18px;cursor:pointer;flex-shrink:0;min-width:40px;height:40px;display:flex;align-items:center;justify-content:center}
+#v113-img-btn:active{transform:scale(.95);border-color:var(--accent-color)}
+#v113-img-preview{display:none;align-items:center;gap:8px;padding:6px 14px;background:var(--card-bg);border-top:1px solid var(--border-color);flex-shrink:0}
+#v113-img-preview.show{display:flex}
+#v113-img-preview img{width:48px;height:48px;object-fit:cover;border-radius:8px;border:1px solid var(--border-color)}
+#v113-img-preview .meta{flex:1;font-size:12px;color:#8a9bb0;min-width:0}
+#v113-img-preview .meta b{display:block;color:var(--text-color);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#v113-img-clear{border:1px solid var(--border-color);background:var(--bg-color);color:#fca5a5;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer}
+.message.user-image img,.message.bot-image img{max-width:min(240px,70vw);max-height:220px;border-radius:10px;display:block;margin:4px 0}
+.message.user-image{padding:8px!important}
+#v113-group-modal,#v113-os-modal{display:none;position:fixed;inset:0;z-index:10070;background:rgba(0,0,0,.8);align-items:center;justify-content:center;padding:12px;box-sizing:border-box}
+#v113-group-modal.open,#v113-os-modal.open{display:flex!important}
+.v113-box{background:var(--card-bg,#151a24);border:1px solid var(--border-color,#2a3447);border-radius:14px;width:100%;max-width:420px;max-height:90vh;display:flex;flex-direction:column;color:var(--text-color,#e0e6ed);overflow:hidden}
+.v113-box .head{padding:14px 16px 8px;text-align:center;flex-shrink:0}
+.v113-box .head h3{margin:0 0 4px;font-size:16px}
+.v113-box .head p{margin:0;font-size:11px;color:#8a9bb0;line-height:1.4}
+.v113-body{flex:1;overflow-y:auto;padding:12px 14px;-webkit-overflow-scrolling:touch}
+.v113-foot{padding:10px 14px;border-top:1px solid var(--border-color);flex-shrink:0}
+.v113-btn{width:100%;padding:10px;border:none;border-radius:8px;background:var(--accent-color,#8a2be2);color:#fff;font-weight:700;cursor:pointer;font-size:13px;margin-top:6px}
+.v113-btn.gray{background:#334155}
+.v113-btn.danger{background:#b91c1c}
+.v113-btn.small{width:auto;padding:7px 12px;font-size:12px;margin-top:0;display:inline-block}
+.v113-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:10px;margin-bottom:7px}
+.v113-row label{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;font-size:13px}
+.v113-row input[type=checkbox]{width:18px;height:18px}
+.v113-input{width:100%;padding:10px;background:var(--bg-color);border:1px solid var(--border-color);color:var(--text-color);border-radius:8px;font-size:14px;margin-bottom:8px;outline:none;box-sizing:border-box}
+.v113-hint{font-size:11px;color:#8a9bb0;line-height:1.45;margin:6px 0 10px}
+.v113-sec-title{font-size:12px;font-weight:700;color:var(--accent-color);margin:0 0 8px}
+.v113-ability{padding:12px;border:1px solid var(--border-color);border-radius:10px;background:var(--bg-color);margin-bottom:8px}
+.v113-ability h4{margin:0 0 4px;font-size:13px}
+.v113-ability p{margin:0 0 8px;font-size:11px;color:#8a9bb0;line-height:1.4}
+.v113-locked{opacity:.55;pointer-events:none}
+.v113-badge{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid var(--accent-color);color:var(--accent-color);font-size:10px;font-weight:700;margin-left:4px}
+</style>
+
+<div id="v113-img-preview">
+  <img id="v113-img-thumb" alt="preview">
+  <div class="meta"><b id="v113-img-name">이미지</b><span id="v113-img-size"></span></div>
+  <button type="button" id="v113-img-clear">제거</button>
+</div>
+<input type="file" id="v113-file-input" accept="image/*" style="display:none" capture="environment">
+
+<div id="v113-group-modal">
+  <div class="v113-box">
+    <div class="head">
+      <h3>👥 커스텀 단톡방 만들기</h3>
+      <p>학생을 골라 나만의 동아리 단톡방을 만듭니다</p>
+    </div>
+    <div class="v113-body" id="v113-group-body"></div>
+    <div class="v113-foot">
+      <button type="button" class="v113-btn" id="v113-group-create">단톡방 생성</button>
+      <button type="button" class="v113-btn gray" id="v113-group-close">닫기</button>
+    </div>
+  </div>
+</div>
+
+<div id="v113-os-modal">
+  <div class="v113-box">
+    <div class="head">
+      <h3>🖥️ OS 능력</h3>
+      <p id="v113-os-sub">아로나 · 프라나 · 노로나 · 시레나 전용 기능</p>
+    </div>
+    <div class="v113-body" id="v113-os-body"></div>
+    <div class="v113-foot">
+      <button type="button" class="v113-btn gray" id="v113-os-close">닫기</button>
+    </div>
+  </div>
+</div>
+
+<script id="v113-features">
+/* v11.3: 이미지 반응 · 커스텀 단톡방 · OS 능력 */
+(function () {
+  'use strict';
+  if (window.__PRANA_V113__) return;
+  window.__PRANA_V113__ = true;
+
+  var CUSTOM_GROUP_KEY = 'PRANA_V113_CUSTOM_GROUPS';
+  var pendingImage = null; // { dataUrl, mime, name, size }
+
+  function sg(k) {
+    try { return (typeof safeGet === 'function') ? safeGet(k) : (localStorage.getItem(k) || ''); }
+    catch (e) { return ''; }
+  }
+  function ss(k, v) {
+    try { if (typeof safeSet === 'function') safeSet(k, v); else localStorage.setItem(k, String(v)); }
+    catch (e) {}
+  }
+
+  function loadCustomGroups() {
+    try {
+      var o = JSON.parse(sg(CUSTOM_GROUP_KEY) || '{}');
+      return (o && typeof o === 'object') ? o : {};
+    } catch (e) { return {}; }
+  }
+  function saveCustomGroups(o) { ss(CUSTOM_GROUP_KEY, JSON.stringify(o || {})); }
+
+  function isHiddenUnlocked(id) {
+    try {
+      if (typeof isStudentOwned === 'function' && isStudentOwned(id)) return true;
+    } catch (e) {}
+    try {
+      var raw = sg('PRANA_OWNED_STUDENTS') || sg('PRANA_UNLOCKED') || '';
+      if (raw && raw.indexOf(id) !== -1) return true;
+    } catch (e) {}
+    // Multiverse code unlocks norona/sirena — check redeemed or persona accessibility
+    try {
+      var redeemed = JSON.parse(sg('PRANA_SECRET_REDEEMED') || '{}');
+      if (redeemed['Multiverse']) return true;
+    } catch (e) {}
+    return false;
+  }
+
+  function canUseOsAbility(charId) {
+    if (charId === 'arona' || charId === 'prana') return true;
+    if (charId === 'norona' || charId === 'sirena') return isHiddenUnlocked(charId);
+    return false;
+  }
+
+  function currentPersonaSafe() {
+    try {
+      var P = window.PERSONAS || (typeof PERSONAS !== 'undefined' ? PERSONAS : {});
+      var mode = (typeof currentMode !== 'undefined') ? currentMode : 'prana';
+      return P[mode] || P.prana || null;
+    } catch (e) { return null; }
+  }
+
+  /* ========== 1. 이미지 업로드 & 반응 ========== */
+  function placeImageBtn() {
+    var footer = document.querySelector('footer');
+    if (!footer || document.getElementById('v113-img-btn')) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'v113-img-btn';
+    btn.title = '사진/그림 올리기';
+    btn.setAttribute('aria-label', '사진 올리기');
+    btn.textContent = '🖼️';
+    btn.onclick = function () {
+      var inp = document.getElementById('v113-file-input');
+      if (inp) inp.click();
+    };
+    var send = document.getElementById('send-btn');
+    if (send && send.parentNode === footer) footer.insertBefore(btn, send);
+    else footer.appendChild(btn);
+
+    // preview bar above footer
+    var prev = document.getElementById('v113-img-preview');
+    if (prev && prev.parentNode !== document.body) {
+      // already in body
+    } else if (prev && footer.parentNode) {
+      footer.parentNode.insertBefore(prev, footer);
+    }
+  }
+
+  function clearPendingImage() {
+    pendingImage = null;
+    var prev = document.getElementById('v113-img-preview');
+    if (prev) prev.classList.remove('show');
+    var inp = document.getElementById('v113-file-input');
+    if (inp) inp.value = '';
+  }
+
+  function setPendingImage(file) {
+    if (!file || !file.type || file.type.indexOf('image/') !== 0) {
+      alert('이미지 파일만 올릴 수 있습니다.');
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      alert('이미지는 4MB 이하로 올려 주세요.');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var dataUrl = String(reader.result || '');
+      // compress large images for API
+      compressDataUrl(dataUrl, file.type, function (out) {
+        pendingImage = {
+          dataUrl: out.dataUrl,
+          mime: out.mime,
+          name: file.name || 'image',
+          size: out.size || file.size
+        };
+        var thumb = document.getElementById('v113-img-thumb');
+        var nameEl = document.getElementById('v113-img-name');
+        var sizeEl = document.getElementById('v113-img-size');
+        var prev = document.getElementById('v113-img-preview');
+        if (thumb) thumb.src = pendingImage.dataUrl;
+        if (nameEl) nameEl.textContent = pendingImage.name;
+        if (sizeEl) sizeEl.textContent = (pendingImage.size / 1024).toFixed(0) + ' KB · 전송 시 캐릭터가 반응합니다';
+        if (prev) prev.classList.add('show');
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function compressDataUrl(dataUrl, mime, cb) {
+    try {
+      var img = new Image();
+      img.onload = function () {
+        var max = 1024;
+        var w = img.width, h = img.height;
+        if (w > max || h > max) {
+          if (w > h) { h = Math.round(h * max / w); w = max; }
+          else { w = Math.round(w * max / h); h = max; }
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        var outMime = 'image/jpeg';
+        var out = canvas.toDataURL(outMime, 0.82);
+        var approx = Math.round((out.length - 22) * 0.75);
+        cb({ dataUrl: out, mime: outMime, size: approx });
+      };
+      img.onerror = function () { cb({ dataUrl: dataUrl, mime: mime || 'image/jpeg', size: 0 }); };
+      img.src = dataUrl;
+    } catch (e) {
+      cb({ dataUrl: dataUrl, mime: mime || 'image/jpeg', size: 0 });
+    }
+  }
+
+  function dataUrlToInline(dataUrl) {
+    var m = String(dataUrl).match(/^data:([^;]+);base64,(.+)$/);
+    if (!m) return null;
+    return { mime_type: m[1], data: m[2] };
+  }
+
+  function appendUserImageMessage(dataUrl, caption) {
+    try {
+      if (typeof appendMessage === 'function') {
+        var el = appendMessage(
+          (typeof getUserDisplayName === 'function' ? getUserDisplayName() : '선생님'),
+          caption || '(사진)',
+          false,
+          '',
+          null
+        );
+        // enhance bubble with image
+        if (el) {
+          var bubble = el.querySelector ? el.querySelector('.message') : null;
+          if (!bubble && el.classList && el.classList.contains('message')) bubble = el;
+          if (bubble) {
+            bubble.classList.add('user-image');
+            var img = document.createElement('img');
+            img.src = dataUrl;
+            img.alt = '올린 사진';
+            var textNode = bubble.querySelector('.message-text');
+            if (textNode) {
+              bubble.insertBefore(img, textNode);
+            } else {
+              bubble.insertBefore(img, bubble.firstChild);
+            }
+          }
+        }
+        return el;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function buildImageReactionPrompt(persona, caption) {
+    var lines = [
+      '\n\n[🖼️ 이미지 반응 모드]',
+      '선생님이 사진/그림을 올렸습니다.' + (caption ? ' 첨부 메시지: 「' + caption + '」' : ''),
+      '이미지를 보고 캐릭터답게 자연스럽게 반응하세요.',
+      '- 그림/사진 내용에 대해 궁금증, 칭찬, 장난, 걱정 등 다양한 반응을 하세요.',
+      '- 예: 「이 그림은 뭐예요?」, 「와, 그림 잘 그리시네요!」, 「선생님 얼굴인가요?」, 「이거 어디서 찍으신 거예요?」 등.',
+      '- 이미지를 직접 본 것처럼 구체적인 요소(색, 구도, 인물, 배경, 분위기)를 짧게 언급하세요.',
+      '- 과장된 시스템 설명은 하지 말고, 대화 톤으로 2~4문장 이내.'
+    ];
+    if (persona && persona.isGroup) {
+      lines.push('- 단톡방이므로 부원 2~3명이 [이름] 대사 형식으로 서로 반응하세요.');
+    }
+    return lines.join('\n');
+  }
+
+  function installSendImageHook() {
+    if (typeof window.sendMessage !== 'function') return;
+    if (window.sendMessage.__v113img) return;
+    var prev = window.sendMessage;
+    var wrapped = async function () {
+      if (!pendingImage) return prev.apply(this, arguments);
+
+      var img = pendingImage;
+      var input = document.getElementById('user-input');
+      var caption = input ? input.value.trim() : '';
+      var apiKeyLocal = null;
+      try {
+        apiKeyLocal = (typeof apiKey !== 'undefined' && apiKey) ? apiKey : sg('PRANA_GEMINI_API_KEY');
+      } catch (e) { apiKeyLocal = sg('PRANA_GEMINI_API_KEY'); }
+
+      if (!apiKeyLocal) {
+        if (typeof openApiKeyModal === 'function') openApiKeyModal();
+        return;
+      }
+
+      clearPendingImage();
+      if (input) input.value = '';
+      var sendBtn = document.getElementById('send-btn');
+      if (sendBtn) sendBtn.disabled = true;
+
+      var persona = currentPersonaSafe() || { name: '프라나', id: 'prana', prompt: '' };
+      var userLabel = (typeof getUserDisplayName === 'function') ? getUserDisplayName() : '선생님';
+
+      // show user image in chat
+      appendUserImageMessage(img.dataUrl, caption || '사진을 올렸습니다');
+      try { if (typeof saveConversation === 'function') saveConversation(); } catch (e) {}
+
+      // loading
+      var chatContainer = document.getElementById('chat-container');
+      var loadingRow = document.createElement('div');
+      loadingRow.className = 'message-row bot-row';
+      loadingRow.id = 'loading-row';
+      var loadingDiv = document.createElement('div');
+      loadingDiv.className = 'message bot';
+      loadingDiv.id = 'loading-msg';
+      if (typeof createTypingIndicator === 'function') {
+        loadingDiv.appendChild(createTypingIndicator());
+      } else {
+        loadingDiv.textContent = '…';
+      }
+      loadingRow.appendChild(loadingDiv);
+      if (chatContainer) {
+        chatContainer.appendChild(loadingRow);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+
+      var systemBase = '';
+      try {
+        if (persona.isGroup && Array.isArray(persona.members)) {
+          var memberPrompts = persona.members.map(function (mId) {
+            var m = (window.PERSONAS || {})[mId];
+            return m ? '- [' + m.name + ']: ' + (m.prompt || '') : '';
+          }).filter(Boolean).join('\n');
+          systemBase = '당신은 \'블루 아카이브\'의 [' + persona.name + '] 동아리 부원들입니다.\n소속 부원:\n' + memberPrompts +
+            '\n[대화 규칙] 각 줄은 반드시 `[캐릭터이름] 대사` 형식. 2~3명이 이미지에 반응.';
+        } else {
+          systemBase = (persona.prompt || ('당신은 블루 아카이브의 ' + persona.name + '입니다.'));
+        }
+      } catch (e) {
+        systemBase = '당신은 블루 아카이브 캐릭터입니다.';
+      }
+      systemBase += buildImageReactionPrompt(persona, caption);
+
+      var inline = dataUrlToInline(img.dataUrl);
+      var userParts = [];
+      if (inline) {
+        userParts.push({ inline_data: { mime_type: inline.mime_type, data: inline.data } });
+      }
+      userParts.push({ text: caption ? ('선생님이 이 이미지를 올렸습니다. 메시지: ' + caption) : '선생님이 이 이미지를 올렸습니다. 이미지에 대해 반응해 주세요.' });
+
+      // push history (text-only summary for storage compatibility)
+      try {
+        if (typeof conversationHistory !== 'undefined' && Array.isArray(conversationHistory)) {
+          conversationHistory.push({
+            role: 'user',
+            parts: [{ text: (caption ? caption + ' ' : '') + '[이미지 첨부]' }]
+          });
+        }
+      } catch (e) {}
+
+      var models = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+      var responseText = null;
+      var lastErr = '';
+
+      for (var i = 0; i < models.length; i++) {
+        try {
+          var body = {
+            system_instruction: { parts: [{ text: systemBase }] },
+            contents: [{ role: 'user', parts: userParts }]
+          };
+          var res = await fetch(
+            'https://generativelanguage.googleapis.com/v1beta/models/' + models[i] + ':generateContent?key=' + encodeURIComponent(apiKeyLocal),
+            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+          );
+          var data = await res.json().catch(function () { return {}; });
+          if (!res.ok) {
+            lastErr = (data && data.error && data.error.message) || ('HTTP ' + res.status);
+            continue;
+          }
+          var parts = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
+          if (Array.isArray(parts)) {
+            var texts = parts.filter(function (p) { return p && typeof p.text === 'string' && p.text.trim(); }).map(function (p) { return p.text.trim(); });
+            if (texts.length) {
+              responseText = texts.join('\n');
+              break;
+            }
+          }
+        } catch (err) {
+          lastErr = (err && err.message) || String(err);
+        }
+      }
+
+      var lr = document.getElementById('loading-row');
+      if (lr) lr.remove();
+
+      if (responseText) {
+        try {
+          if (typeof conversationHistory !== 'undefined' && Array.isArray(conversationHistory)) {
+            conversationHistory.push({ role: 'model', parts: [{ text: responseText }] });
+          }
+        } catch (e) {}
+
+        if (persona.isGroup) {
+          var rawLines = responseText.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+          var parsed = [];
+          rawLines.forEach(function (line) {
+            var match = line.match(/^\[([^\]]+)\]\s*(.*)/);
+            if (match) parsed.push({ name: match[1].trim(), text: match[2].trim() });
+            else if (parsed.length) parsed[parsed.length - 1].text += '\n' + line;
+            else parsed.push({ name: persona.name, text: line });
+          });
+          for (var j = 0; j < parsed.length; j++) {
+            if (typeof appendMessage === 'function') {
+              var el = appendMessage(parsed[j].name, '', true, parsed[j].name, null);
+              if (typeof typeMessageInto === 'function') await typeMessageInto(el, parsed[j].text, 18);
+              else if (el) {
+                var mt = el.querySelector ? el.querySelector('.message-text') : null;
+                if (mt) mt.textContent = parsed[j].text;
+              }
+            }
+            await new Promise(function (r) { setTimeout(r, 250); });
+          }
+        } else {
+          if (typeof appendMessage === 'function') {
+            var el2 = appendMessage(persona.name, '', true, persona.name, null);
+            if (typeof typeMessageInto === 'function') await typeMessageInto(el2, responseText, 22);
+            else if (el2) {
+              var mt2 = el2.querySelector ? el2.querySelector('.message-text') : null;
+              if (mt2) mt2.textContent = responseText;
+            }
+          }
+        }
+        try { if (typeof saveConversation === 'function') saveConversation(); } catch (e) {}
+      } else {
+        if (typeof appendMessage === 'function') {
+          appendMessage(persona.name, '이미지를 확인하지 못했어요.\n' + (lastErr || '승인 코드와 인터넷을 확인해 주세요.'), true, persona.name);
+        }
+      }
+      if (sendBtn) sendBtn.disabled = false;
+    };
+    wrapped.__v113img = true;
+    if (prev.__pranaModeGuard) wrapped.__pranaModeGuard = true;
+    if (prev.__v111ws) wrapped.__v111ws = true;
+    window.sendMessage = wrapped;
+    try { sendMessage = wrapped; } catch (e) {}
+  }
+
+  /* ========== 2. 커스텀 단톡방 ========== */
+  function listSelectableStudents() {
+    var ids = [];
+    try {
+      var P = window.PERSONAS || {};
+      Object.keys(P).forEach(function (id) {
+        var p = P[id];
+        if (!p || p.isGroup || p.noStudentSetting) return;
+        if (p.noBond && id !== 'arona' && id !== 'prana') {
+          // allow OS and most students
+        }
+        // skip pure system-only if locked
+        ids.push(id);
+      });
+    } catch (e) {}
+    return ids;
+  }
+
+  function registerCustomGroup(id, data) {
+    try {
+      if (typeof PERSONAS === 'undefined' && !window.PERSONAS) return;
+      var P = window.PERSONAS || PERSONAS;
+      P[id] = data;
+      window.PERSONAS = P;
+      try { PERSONAS = P; } catch (e) {}
+    } catch (e) {}
+  }
+
+  function hydrateCustomGroups() {
+    var map = loadCustomGroups();
+    Object.keys(map).forEach(function (id) {
+      var g = map[id];
+      if (!g || !Array.isArray(g.members) || !g.members.length) return;
+      registerCustomGroup(id, {
+        id: id,
+        name: g.name || '커스텀 단톡',
+        title: g.name || '커스텀 단톡',
+        sub: '커스텀 단톡방 · ' + g.members.length + '명',
+        avatar: '👥',
+        isGroup: true,
+        isCustom: true,
+        members: g.members.slice(),
+        greeting: g.greeting || ('[' + (g.name || '단톡') + '] 커스텀 단톡방에 오신 것을 환영합니다!'),
+        prompt: ''
+      });
+    });
+  }
+
+  function openGroupModal() {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    var m = document.getElementById('v113-group-modal');
+    var body = document.getElementById('v113-group-body');
+    if (!m || !body) return;
+    body.innerHTML = '';
+
+    body.appendChild(Object.assign(document.createElement('div'), { className: 'v113-sec-title', textContent: '단톡방 이름' }));
+    var nameInp = document.createElement('input');
+    nameInp.className = 'v113-input';
+    nameInp.id = 'v113-group-name';
+    nameInp.placeholder = '예: 야식 탐험대, 비밀 작전회의';
+    body.appendChild(nameInp);
+
+    body.appendChild(Object.assign(document.createElement('div'), { className: 'v113-sec-title', textContent: '구성원 선택 (2명 이상)' }));
+    body.appendChild(Object.assign(document.createElement('p'), {
+      className: 'v113-hint',
+      textContent: '모집·해금된 학생을 고를 수 있습니다. 저장 후 캐릭터 목록의 「동아리 단톡방」 탭에서 입장하세요.'
+    }));
+
+    var list = document.createElement('div');
+    list.id = 'v113-member-list';
+    var ids = listSelectableStudents();
+    var P = window.PERSONAS || {};
+    ids.sort(function (a, b) {
+      var na = (P[a] && P[a].name) || a;
+      var nb = (P[b] && P[b].name) || b;
+      return na.localeCompare(nb, 'ko');
+    });
+    ids.forEach(function (id) {
+      var p = P[id];
+      if (!p) return;
+      var owned = true;
+      try {
+        if (typeof isStudentOwned === 'function') owned = isStudentOwned(id) || id === 'arona' || id === 'prana';
+      } catch (e) {}
+      if (!owned && id !== 'arona' && id !== 'prana') return;
+
+      var row = document.createElement('div');
+      row.className = 'v113-row';
+      var lab = document.createElement('label');
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = id;
+      cb.className = 'v113-member-cb';
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode((p.avatar ? p.avatar + ' ' : '') + (p.name || id)));
+      row.appendChild(lab);
+      list.appendChild(row);
+    });
+    body.appendChild(list);
+
+    // existing custom groups
+    var existing = loadCustomGroups();
+    var keys = Object.keys(existing);
+    if (keys.length) {
+      body.appendChild(Object.assign(document.createElement('div'), { className: 'v113-sec-title', textContent: '만든 단톡방' }));
+      keys.forEach(function (id) {
+        var g = existing[id];
+        var row = document.createElement('div');
+        row.className = 'v113-row';
+        row.style.justifyContent = 'space-between';
+        var info = document.createElement('div');
+        info.innerHTML = '<b style="font-size:13px">' + (g.name || id) + '</b><span style="display:block;font-size:11px;color:#8a9bb0">' + (g.members || []).length + '명</span>';
+        var del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'v113-btn danger small';
+        del.textContent = '삭제';
+        del.onclick = function () {
+          if (!confirm('「' + (g.name || id) + '」 단톡방을 삭제할까요?')) return;
+          var map = loadCustomGroups();
+          delete map[id];
+          saveCustomGroups(map);
+          try {
+            if (window.PERSONAS) delete window.PERSONAS[id];
+          } catch (e) {}
+          openGroupModal();
+        };
+        row.appendChild(info);
+        row.appendChild(del);
+        body.appendChild(row);
+      });
+    }
+
+    m.classList.add('open');
+    m.style.display = 'flex';
+  }
+
+  function closeGroupModal() {
+    var m = document.getElementById('v113-group-modal');
+    if (m) { m.classList.remove('open'); m.style.display = 'none'; }
+  }
+
+  function createCustomGroup() {
+    var nameInp = document.getElementById('v113-group-name');
+    var name = (nameInp && nameInp.value.trim()) || '';
+    if (!name) { alert('단톡방 이름을 입력해 주세요.'); return; }
+    var cbs = document.querySelectorAll('.v113-member-cb:checked');
+    var members = [];
+    cbs.forEach(function (c) { if (c.value) members.push(c.value); });
+    if (members.length < 2) { alert('구성원을 2명 이상 선택해 주세요.'); return; }
+
+    var id = 'custom_group_' + Date.now().toString(36);
+    var P = window.PERSONAS || {};
+    var memberNames = members.map(function (mid) { return (P[mid] && P[mid].name) || mid; });
+    var greetingParts = members.slice(0, 3).map(function (mid) {
+      var n = (P[mid] && P[mid].name) || mid;
+      return '[' + n + '] 선생님, 「' + name + '」 단톡방에 오신 걸 환영해요!';
+    });
+
+    var data = {
+      name: name,
+      members: members,
+      greeting: greetingParts.join('\n'),
+      createdAt: Date.now()
+    };
+    var map = loadCustomGroups();
+    map[id] = data;
+    saveCustomGroups(map);
+
+    registerCustomGroup(id, {
+      id: id,
+      name: name,
+      title: name,
+      sub: '커스텀 단톡방 · ' + members.length + '명',
+      avatar: '👥',
+      isGroup: true,
+      isCustom: true,
+      members: members.slice(),
+      greeting: data.greeting,
+      prompt: ''
+    });
+
+    closeGroupModal();
+    alert('단톡방 「' + name + '」이(가) 생성되었습니다!\n캐릭터 선택 → 동아리 단톡방 탭에서 입장할 수 있습니다.\n구성원: ' + memberNames.join(', '));
+    try {
+      if (typeof renderCharList === 'function') renderCharList(document.getElementById('char-search-input') && document.getElementById('char-search-input').value || '');
+    } catch (e) {}
+    try {
+      if (typeof switchMode === 'function') {
+        // optional: don't auto-switch
+      }
+    } catch (e) {}
+  }
+
+  /* ========== 3. OS 능력 ========== */
+  function openOsModal() {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    var m = document.getElementById('v113-os-modal');
+    var body = document.getElementById('v113-os-body');
+    var sub = document.getElementById('v113-os-sub');
+    if (!m || !body) return;
+    body.innerHTML = '';
+
+    var mode = (typeof currentMode !== 'undefined') ? currentMode : '';
+    var persona = currentPersonaSafe();
+    var activeOs = null;
+    if (mode === 'arona' || mode === 'prana' || mode === 'norona' || mode === 'sirena') activeOs = mode;
+    if (sub) {
+      if (activeOs) sub.textContent = (persona && persona.name ? persona.name : activeOs) + ' 모드에서 능력을 사용할 수 있습니다';
+      else sub.textContent = '아로나/프라나(기본) · 노로나/시레나(비밀 코드 Multiverse 해금 후)';
+    }
+
+    function abilityCard(title, desc, locked, onClick, btnLabel) {
+      var card = document.createElement('div');
+      card.className = 'v113-ability' + (locked ? ' v113-locked' : '');
+      var h = document.createElement('h4');
+      h.textContent = title;
+      if (locked) {
+        var b = document.createElement('span');
+        b.className = 'v113-badge';
+        b.textContent = '잠김';
+        h.appendChild(b);
+      }
+      var p = document.createElement('p');
+      p.textContent = desc;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'v113-btn small';
+      btn.textContent = btnLabel || '실행';
+      btn.disabled = !!locked;
+      btn.onclick = onClick;
+      card.appendChild(h);
+      card.appendChild(p);
+      card.appendChild(btn);
+      return card;
+    }
+
+    var osUnlocked = {
+      arona: true,
+      prana: true,
+      norona: isHiddenUnlocked('norona'),
+      sirena: isHiddenUnlocked('sirena')
+    };
+
+    body.appendChild(Object.assign(document.createElement('div'), { className: 'v113-sec-title', textContent: '사용 가능 OS' }));
+    var status = document.createElement('p');
+    status.className = 'v113-hint';
+    status.innerHTML = '아로나 · 프라나: 사용 가능<br>노로나: ' + (osUnlocked.norona ? '해금됨' : '비밀 코드 「Multiverse」 필요') +
+      '<br>시레나: ' + (osUnlocked.sirena ? '해금됨' : '비밀 코드 「Multiverse」 필요');
+    body.appendChild(status);
+
+    if (!activeOs) {
+      body.appendChild(Object.assign(document.createElement('p'), {
+        className: 'v113-hint',
+        textContent: '능력을 쓰려면 먼저 아로나, 프라나, 노로나, 시레나 중 한 명과 대화방을 여세요.'
+      }));
+    }
+
+    var canAct = activeOs && canUseOsAbility(activeOs);
+
+    // 1) 대리 출석
+    body.appendChild(abilityCard(
+      '📅 대신 일일 출석 받기',
+      (persona && persona.name ? persona.name : 'OS') + '가 선생님 대신 오늘의 일일 출석 보상을 수령합니다.',
+      !canAct,
+      function () {
+        try {
+          if (typeof claimDailyReward === 'function') {
+            claimDailyReward();
+            if (typeof appendMessage === 'function') {
+              appendMessage(
+                (persona && persona.name) || 'OS',
+                activeOs === 'sirena'
+                  ? '…일일 출석 로그를 처리했습니다. 보상 반영을 확인하세요.'
+                  : activeOs === 'norona'
+                    ? '빠밤~! 출석 대신 찍어 드렸어요! 보상 확인해 보세요~'
+                    : activeOs === 'arona'
+                      ? '출석 체크 완료예요, 선생님! 오늘도 수고하셨어요~'
+                      : '일일 출석을 대신 처리했습니다. 보상은 정상 반영됩니다.',
+                true,
+                (persona && persona.name) || 'OS',
+                null,
+                { hideActions: true }
+              );
+              try { if (typeof saveConversation === 'function') saveConversation(); } catch (e) {}
+            }
+          } else {
+            alert('출석 시스템을 찾을 수 없습니다.');
+          }
+        } catch (e) {
+          alert('출석 처리 중 오류: ' + (e.message || e));
+        }
+        closeOsModal();
+      },
+      '출석 대리 수령'
+    ));
+
+    // 2) 칭호 변경
+    body.appendChild(abilityCard(
+      '🏷️ 업적 칭호 바꿔주기',
+      '선생님이 사용하는 칭호(호칭 앞부분)를 OS가 바로 변경해 줍니다.',
+      !canAct,
+      function () {
+        var cur = '';
+        try { cur = (typeof userTitle !== 'undefined' ? userTitle : sg('PRANA_USER_TITLE')) || '샬레의'; } catch (e) { cur = '샬레의'; }
+        var next = prompt('새 칭호를 입력하세요 (예: 총학생회 고문, 키보토스의)', cur);
+        if (next == null) return;
+        next = String(next).trim();
+        if (!next) { alert('칭호가 비어 있습니다.'); return; }
+        try {
+          if (typeof userTitle !== 'undefined') {
+            try { userTitle = next; } catch (e) {}
+          }
+          ss('PRANA_USER_TITLE', next);
+          // also update if open profile fields
+          var inp = document.getElementById('user-title-input');
+          if (inp) inp.value = next;
+          if (typeof appendMessage === 'function') {
+            appendMessage(
+              (persona && persona.name) || 'OS',
+              activeOs === 'sirena'
+                ? '칭호 레코드를 「' + next + '」로 갱신했습니다.'
+                : activeOs === 'norona'
+                  ? '헤헤, 칭호를 「' + next + '」로 바꿔 드렸어요!'
+                  : activeOs === 'arona'
+                    ? '칭호를 「' + next + '」로 바꿔 두었어요, 선생님!'
+                    : '칭호를 「' + next + '」로 설정했습니다.',
+              true,
+              (persona && persona.name) || 'OS',
+              null,
+              { hideActions: true }
+            );
+            try { if (typeof saveConversation === 'function') saveConversation(); } catch (e) {}
+          }
+          alert('칭호가 「' + next + '」로 변경되었습니다.');
+        } catch (e) {
+          alert('칭호 변경 실패: ' + (e.message || e));
+        }
+        closeOsModal();
+      },
+      '칭호 변경'
+    ));
+
+    // 3) 이름 변경
+    body.appendChild(abilityCard(
+      '✏️ 선생님 이름 변경',
+      '대화에서 쓰이는 선생님 표시 이름을 변경합니다.',
+      !canAct,
+      function () {
+        var cur = '';
+        try { cur = (typeof userName !== 'undefined' ? userName : sg('PRANA_USER_NAME')) || '선생님'; } catch (e) { cur = '선생님'; }
+        var next = prompt('새 이름을 입력하세요', cur);
+        if (next == null) return;
+        next = String(next).trim();
+        if (!next) { alert('이름이 비어 있습니다.'); return; }
+        try {
+          try { if (typeof userName !== 'undefined') userName = next; } catch (e) {}
+          ss('PRANA_USER_NAME', next);
+          var inp = document.getElementById('user-name-input');
+          if (inp) inp.value = next;
+          if (typeof appendMessage === 'function') {
+            appendMessage(
+              (persona && persona.name) || 'OS',
+              '이름을 「' + next + '」로 업데이트했습니다.',
+              true,
+              (persona && persona.name) || 'OS',
+              null,
+              { hideActions: true }
+            );
+          }
+          alert('이름이 「' + next + '」로 변경되었습니다.');
+        } catch (e) {
+          alert('이름 변경 실패: ' + (e.message || e));
+        }
+        closeOsModal();
+      },
+      '이름 변경'
+    ));
+
+    // 4) 대화 요약 메모 (가벼운 능력)
+    body.appendChild(abilityCard(
+      '📝 최근 대화 요약',
+      '현재 방의 최근 메시지를 OS가 짧게 정리해 줍니다. (로컬 요약)',
+      !canAct,
+      function () {
+        try {
+          var hist = (typeof conversationHistory !== 'undefined') ? conversationHistory : [];
+          var tail = hist.slice(-8);
+          var lines = tail.map(function (h) {
+            var t = (h.parts && h.parts[0] && h.parts[0].text) || '';
+            return (h.role === 'user' ? '선생님: ' : '상대: ') + String(t).slice(0, 80);
+          });
+          var summary = lines.length
+            ? '최근 대화 요약입니다.\n' + lines.join('\n')
+            : '아직 요약할 대화가 충분하지 않습니다.';
+          if (typeof appendMessage === 'function') {
+            appendMessage((persona && persona.name) || 'OS', summary, true, (persona && persona.name) || 'OS', null, { hideActions: true });
+            try { if (typeof saveConversation === 'function') saveConversation(); } catch (e) {}
+          }
+        } catch (e) {
+          alert('요약 실패: ' + (e.message || e));
+        }
+        closeOsModal();
+      },
+      '요약하기'
+    ));
+
+    // 5) 노로나/시레나 전용: 랜덤 상태 리롤 힌트
+    if (activeOs === 'norona' || activeOs === 'sirena') {
+      body.appendChild(abilityCard(
+        '🌐 멀티버스 신호 스캔',
+        '히든 OS 전용. 월드 스테이트(학생 상태)를 한 번 새로 고치도록 돕습니다.',
+        !canAct || !osUnlocked[activeOs],
+        function () {
+          try {
+            if (typeof window.openV111WorldState === 'function') {
+              closeOsModal();
+              window.openV111WorldState();
+              alert('월드 스테이트 창을 열었습니다. 「새로고침」으로 상태를 다시 뽑을 수 있습니다.');
+            } else {
+              alert('월드 스테이트 모듈이 없습니다.');
+            }
+          } catch (e) {
+            alert(String(e.message || e));
+          }
+        },
+        '월드 스테이트 열기'
+      ));
+    }
+
+    m.classList.add('open');
+    m.style.display = 'flex';
+  }
+
+  function closeOsModal() {
+    var m = document.getElementById('v113-os-modal');
+    if (m) { m.classList.remove('open'); m.style.display = 'none'; }
+  }
+
+  window.openV113CustomGroup = openGroupModal;
+  window.closeV113CustomGroup = closeGroupModal;
+  window.openV113OsAbility = openOsModal;
+  window.closeV113OsAbility = closeOsModal;
+
+  function injectMenu() {
+    var list = document.querySelector('#main-menu-modal .menu-list') ||
+      (typeof window.__pranaGetMenuList === 'function' ? window.__pranaGetMenuList() : null);
+    if (!list) return;
+
+    if (!document.getElementById('menu-v113-group')) {
+      var g = document.createElement('button');
+      g.type = 'button';
+      g.id = 'menu-v113-group';
+      g.className = 'menu-item-btn';
+      g.setAttribute('data-search', '단톡 커스텀 그룹 제작 만들기 custom group');
+      g.textContent = '👥 커스텀 단톡방 만들기';
+      g.onclick = openGroupModal;
+      list.insertBefore(g, list.firstChild);
+    }
+    if (!document.getElementById('menu-v113-os')) {
+      var o = document.createElement('button');
+      o.type = 'button';
+      o.id = 'menu-v113-os';
+      o.className = 'menu-item-btn';
+      o.setAttribute('data-search', 'OS 능력 아로나 프라나 노로나 시레나 출석 칭호');
+      o.textContent = '🖥️ OS 능력';
+      o.onclick = openOsModal;
+      list.insertBefore(o, list.firstChild);
+    }
+  }
+
+  function boot() {
+    hydrateCustomGroups();
+    placeImageBtn();
+    installSendImageHook();
+    injectMenu();
+
+    var fileInp = document.getElementById('v113-file-input');
+    if (fileInp && !fileInp.__wired) {
+      fileInp.__wired = true;
+      fileInp.addEventListener('change', function () {
+        if (fileInp.files && fileInp.files[0]) setPendingImage(fileInp.files[0]);
+      });
+    }
+    var clearBtn = document.getElementById('v113-img-clear');
+    if (clearBtn) clearBtn.onclick = clearPendingImage;
+
+    var gm = document.getElementById('v113-group-modal');
+    if (gm && !gm.__wired) {
+      gm.__wired = true;
+      gm.addEventListener('click', function (ev) { if (ev.target === gm) closeGroupModal(); });
+    }
+    var om = document.getElementById('v113-os-modal');
+    if (om && !om.__wired) {
+      om.__wired = true;
+      om.addEventListener('click', function (ev) { if (ev.target === om) closeOsModal(); });
+    }
+    var gcreate = document.getElementById('v113-group-create');
+    if (gcreate) gcreate.onclick = createCustomGroup;
+    var gclose = document.getElementById('v113-group-close');
+    if (gclose) gclose.onclick = closeGroupModal;
+    var oclose = document.getElementById('v113-os-close');
+    if (oclose) oclose.onclick = closeOsModal;
+
+    setInterval(function () {
+      placeImageBtn();
+      installSendImageHook();
+      injectMenu();
+      hydrateCustomGroups();
+    }, 7000);
+
+    console.log('[PRANA] v11.3 Image reaction · Custom group · OS ability ready');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+
 </html>
