@@ -23198,7 +23198,7 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
 </div>
 
 <script id="v114-schale-office">
-/* v11.4: 샬레 집무실 · 오늘의 당번 · 전용 권한 · 인수인계 */
+/* v11.4: 샬레 집무실 · 오늘의 당번 · 전용 권한 · 인수인계 · 캐릭터 말투 */
 (function () {
   'use strict';
   if (window.__PRANA_V114__) return;
@@ -23217,60 +23217,252 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
     try { if (typeof safeSet === 'function') safeSet(k, v); else localStorage.setItem(k, String(v)); }
     catch (e) {}
   }
-
   function todayStr() {
     var d = new Date();
-    var y = d.getFullYear();
-    var m = String(d.getMonth() + 1).padStart(2, '0');
-    var day = String(d.getDate()).padStart(2, '0');
-    return y + '-' + m + '-' + day;
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
-
   function loadDuty() {
-    try {
-      var o = JSON.parse(sg(DUTY_KEY) || '{}');
-      return (o && typeof o === 'object') ? o : {};
-    } catch (e) { return {}; }
+    try { var o = JSON.parse(sg(DUTY_KEY) || '{}'); return (o && typeof o === 'object') ? o : {}; }
+    catch (e) { return {}; }
   }
   function saveDuty(o) { ss(DUTY_KEY, JSON.stringify(o || {})); }
-
   function loadLog() {
-    try {
-      var a = JSON.parse(sg(LOG_KEY) || '[]');
-      return Array.isArray(a) ? a : [];
-    } catch (e) { return []; }
+    try { var a = JSON.parse(sg(LOG_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+    catch (e) { return []; }
   }
   function pushLog(entry) {
-    var log = loadLog();
-    log.unshift(entry);
+    var log = loadLog(); log.unshift(entry);
     if (log.length > 7) log = log.slice(0, 7);
     ss(LOG_KEY, JSON.stringify(log));
   }
-
   function getPersonas() {
     return window.PERSONAS || (typeof PERSONAS !== 'undefined' ? PERSONAS : {}) || {};
   }
-
   function nameOf(id) {
     var P = getPersonas();
     return (P[id] && P[id].name) || id;
   }
 
+  var STYLE = {
+    prana:{tone:'formal'}, arona:{tone:'cute',interj:'빠밤-!'}, norona:{tone:'energetic',interj:'빠밤~!'},
+    sirena:{tone:'formal'}, yume:{tone:'polite'}, shiroko:{tone:'cool',banmal:true},
+    shiroko_terror:{tone:'cool',banmal:true}, hoshino:{tone:'lazy',banmal:true,interj:'후아암...'},
+    nonomi:{tone:'cute'}, serika:{tone:'tsundere',banmal:true}, hina:{tone:'cool',banmal:true},
+    iroha:{tone:'cool'}, makoto:{tone:'arrogant',banmal:true}, fuuka:{tone:'polite'},
+    wakamo:{tone:'obsessive'}, asuna:{tone:'energetic',interj:'와아-!'}, toki:{tone:'formal'},
+    neru:{tone:'arrogant',banmal:true}, himari:{tone:'arrogant'}, kazusa:{tone:'cool',banmal:true},
+    natsu:{tone:'energetic'}, hifumi:{tone:'polite'}, koharu:{tone:'shy',interj:'그, 그런...!'},
+    mika:{tone:'energetic',banmal:true,interj:'와하~'}, nagisa:{tone:'formal'}, seia:{tone:'formal'},
+    izuna:{tone:'energetic',interj:'이즈나, 등장!'}, noa:{tone:'polite'}, aru:{tone:'arrogant',banmal:true,interj:'후후!'},
+    haruka:{tone:'shy',interj:'죄, 죄송합니다...'}, kayoko:{tone:'cool',banmal:true},
+    mutsuki:{tone:'chaotic',banmal:true,interj:'쿠후후'}, mari:{tone:'polite'},
+    aris:{tone:'energetic',interj:'빠밤-!'}, yuzu:{tone:'shy'}, momoi:{tone:'energetic',banmal:true},
+    midori:{tone:'polite'}, kei:{tone:'cool'}, yuuka:{tone:'strict'}, rio:{tone:'formal',banmal:true},
+    saori:{tone:'cool',banmal:true}, atsuko:{tone:'shy'}, misaki:{tone:'deadpan'}, hiyori:{tone:'shy'},
+    miyako:{tone:'formal'}, saki:{tone:'strict',banmal:true}, miyu:{tone:'shy'},
+    kanna:{tone:'cool',banmal:true}, serina:{tone:'polite'}, hasumi:{tone:'formal'},
+    tsurugi:{tone:'cool'}, iori:{tone:'strict',banmal:true}, ako:{tone:'polite'},
+    karin:{tone:'cool',banmal:true}, akane:{tone:'polite'}, eimi:{tone:'cool',banmal:true},
+    maki:{tone:'energetic',banmal:true}, airi:{tone:'cute'}, azusa:{tone:'cool'},
+    reisa:{tone:'energetic'}, mine:{tone:'energetic',banmal:true}, tsubaki:{tone:'lazy',banmal:true},
+    ichika:{tone:'polite'}, chinatsu:{tone:'polite'}, nodoka:{tone:'cute'},
+    shigure:{tone:'chaotic',banmal:true}, hikari:{tone:'energetic',banmal:true},
+    nozomi:{tone:'energetic',banmal:true}, niko:{tone:'polite'}, aoba:{tone:'polite'},
+    umika:{tone:'energetic'}, konoka:{tone:'polite'}, rabu:{tone:'energetic',banmal:true},
+    suzumi:{tone:'cool',banmal:true}, eri:{tone:'polite'}, miyo:{tone:'polite'},
+    yakumo:{tone:'cool',banmal:true}, takane:{tone:'formal'}, minori:{tone:'energetic'},
+    subaru:{tone:'energetic',banmal:true}, blacksuit:{tone:'formal',banmal:true},
+    dante:{tone:'deadpan',banmal:true}, donquixote:{tone:'energetic',banmal:true},
+    ishmael:{tone:'cool',banmal:true}, heathcliff:{tone:'arrogant',banmal:true},
+    yisang:{tone:'formal',banmal:true}, faust:{tone:'formal',banmal:true}, gregor:{tone:'deadpan',banmal:true}
+  };
+
+  function getStyle(id) {
+    if (STYLE[id]) return STYLE[id];
+    try {
+      var P = getPersonas(); var p = P[id]; var pr = (p && p.prompt) ? String(p.prompt) : '';
+      if (/반말/.test(pr) && /쿨|담담|과묵/.test(pr)) return { tone: 'cool', banmal: true };
+      if (/반말/.test(pr)) return { tone: 'energetic', banmal: true };
+      if (/자책|소심|불안/.test(pr)) return { tone: 'shy' };
+      if (/밝|귀엽|텐션|활발/.test(pr)) return { tone: 'cute' };
+      if (/정중|차분|간결/.test(pr)) return { tone: 'formal' };
+    } catch (e) {}
+    return { tone: 'polite' };
+  }
+
+  function withInterj(st, s) {
+    if (st.interj && Math.random() < 0.45) return st.interj + ' ' + s;
+    return s;
+  }
+
+  function lineFor(id, kind, ctx) {
+    var st = getStyle(id);
+    var tone = st.tone || 'polite';
+    var notice = (ctx && ctx.notice) || '';
+    var owned = (ctx && ctx.owned) || 0;
+    var members = (ctx && ctx.members) || [];
+    var memberNames = members.map(nameOf).join(', ');
+    var arg = (ctx && ctx.arg) || '';
+    var target = (ctx && ctx.targetName) || arg;
+
+    var T = {};
+    if (kind === 'attend') {
+      T = {
+        formal: '출석 보고드립니다. 현재 모집 인원 약 ' + owned + '명으로 확인됩니다.' + (notice ? ' 공지: ' + notice : ''),
+        cute: withInterj(st, '출석 체크 완료예요! 모집 학생 약 ' + owned + '명이에요~' + (notice ? ' 공지도 있어요: ' + notice : '')),
+        cool: '출석 확인. 모집 ' + owned + '명.' + (notice ? ' 공지 — ' + notice : ''),
+        energetic: withInterj(st, '출석 이상 없음! 모집 인원 대략 ' + owned + '명!' + (notice ? ' 공지: ' + notice : '')),
+        shy: '저, 출석… 확인했어요. 모집 학생이 약 ' + owned + '명…인 것 같아요…' + (notice ? ' 공지도… ' + notice : ''),
+        arrogant: '흥, 출석은 문제없다. 모집 ' + owned + '명.' + (notice ? ' 공지? ' + notice : ''),
+        strict: '출석 이상 없습니다. 모집 인원 ' + owned + '명 확인.' + (notice ? ' 공지 숙지: ' + notice : ''),
+        lazy: '출석… 어, 대충 괜찮지 않아? 모집 ' + owned + '명 정도라구…' + (notice ? ' 공지도 있던가? ' + notice : ''),
+        tsundere: '출, 출석 정도는 내가 알아서 했다고! 모집 ' + owned + '명이야!' + (notice ? ' 공지도 있으니까 읽어!' : ''),
+        chaotic: withInterj(st, '출석~? 모집 ' + owned + '명~ ' + (notice ? '공지: ' + notice : '공지도 없네~')),
+        deadpan: '출석. 모집 ' + owned + '명.' + (notice ? ' 공지: ' + notice : ''),
+        obsessive: '선생님을 위한 출석 보고예요… 모집 ' + owned + '명…',
+        polite: '출석 확인했습니다. 모집 학생 약 ' + owned + '명이에요.' + (notice ? ' 공지: ' + notice : '')
+      };
+    } else if (kind === 'notice_set') {
+      T = {
+        formal: '공지를 등록했습니다. 「' + arg + '」',
+        cute: withInterj(st, '공지 등록 완료예요! 「' + arg + '」 잘 기억할게요~'),
+        cool: '공지 반영. 「' + arg + '」',
+        energetic: withInterj(st, '공지 올렸다! 「' + arg + '」'),
+        shy: '고, 공지… 「' + arg + '」로… 올려 두었어요…',
+        arrogant: '좋아, 공지는 내가 걸었다. 「' + arg + '」 명심하도록.',
+        strict: '공지 등록 완료. 「' + arg + '」 전원 확인하십시오.',
+        lazy: '아~ 공지? 「' + arg + '」… 이걸로 됐지?',
+        tsundere: '공지 정도는 해주지… 「' + arg + '」야.',
+        chaotic: withInterj(st, '공지 쓴다~ 「' + arg + '」'),
+        deadpan: '공지. 「' + arg + '」.',
+        obsessive: '선생님 말씀대로 공지를 걸었어요… 「' + arg + '」…',
+        polite: '공지를 등록해 두었어요. 「' + arg + '」'
+      };
+    } else if (kind === 'notice_empty') {
+      T = {
+        formal: '등록된 공지가 없습니다. /공지 [내용] 으로 작성해 주세요.',
+        cute: '아직 공지가 없어요~ /공지 뒤에 내용을 적어 주세요!',
+        cool: '공지 없음. /공지 로 작성.',
+        energetic: '공지 없다구! /공지 뭐뭐 이렇게 써봐!',
+        shy: '공지가… 아직 없어요… /공지로… 적어 주시면…',
+        arrogant: '공지? 없다. 필요하면 /공지로 말해.',
+        strict: '공지 미등록 상태입니다. /공지 [내용]을 사용하세요.',
+        lazy: '공지 없어~ 귀찮으면 말고…',
+        tsundere: '공지 없다고! 직접 쓰든가!',
+        chaotic: '공지 없네~ 내가 마음대로 쓸까~?',
+        deadpan: '공지 없음.',
+        polite: '등록된 공지가 없어요. /공지 [내용]으로 남겨 주세요.'
+      };
+    } else if (kind === 'report') {
+      var memoYes = !!(ctx && ctx.hasMemo);
+      T = {
+        formal: '현황 보고드립니다. 당번: ' + memberNames + '. ' + (notice ? '공지: ' + notice + '. ' : '공지 없음. ') + (memoYes ? '당번 메모 작성됨.' : '당번 메모 미작성.') + ' 지시 있으면 말씀해 주세요.',
+        cute: withInterj(st, '현황 보고예요! 당번은 ' + memberNames + '!' + (notice ? ' 공지: ' + notice : ' 공지는 아직 없어요.') + (memoYes ? ' 메모도 남겨 뒀어요~' : '')),
+        cool: '보고. 당번 ' + memberNames + '. ' + (notice ? '공지 있음.' : '공지 없음.') + (memoYes ? ' 메모 있음.' : ''),
+        energetic: withInterj(st, '보고한다! 당번 ' + memberNames + '!' + (notice ? ' 공지: ' + notice : '') + ' 다음 지시 대기!'),
+        shy: '저… 당번은 ' + memberNames + '이고… ' + (notice ? '공지는… ' + notice : '공지는 없어요…'),
+        arrogant: '현황 정도는 이 정도면 충분하다. 당번 ' + memberNames + '.',
+        strict: '현황 보고. 당번 ' + memberNames + '. ' + (notice ? '공지: ' + notice : '공지 없음.'),
+        lazy: '음… 당번이 우리(' + memberNames + ')고… ' + (notice ? '공지 있던데…' : '공지는 없고…'),
+        tsundere: '보고하라면 하지… 당번 ' + memberNames + '야.',
+        chaotic: withInterj(st, '보고~ 당번 ' + memberNames + '~'),
+        deadpan: '당번: ' + memberNames + '. ' + (notice || '공지 없음') + '.',
+        polite: '현황 보고드릴게요. 당번 ' + memberNames + '입니다.' + (notice ? ' 공지: ' + notice : '')
+      };
+    } else if (kind === 'tidy') {
+      var note = arg || '집무실 간단 정리';
+      T = {
+        formal: '정리 반영했습니다. 「' + note + '」',
+        cute: withInterj(st, '정리해 뒀어요! 「' + note + '」'),
+        cool: '정리 완료. 「' + note + '」',
+        energetic: withInterj(st, '정리 끝! 「' + note + '」'),
+        shy: '저… 「' + note + '」… 정리해 봤어요…',
+        arrogant: '정리 정도는 기본이지. 「' + note + '」 완료다.',
+        strict: '정리 처리 완료. 「' + note + '」',
+        lazy: '아… 「' + note + '」… 대충 해 뒀어…',
+        tsundere: '정리? 해 줬으니까… 「' + note + '」…',
+        chaotic: withInterj(st, '정리~? 「' + note + '」'),
+        deadpan: '정리. 「' + note + '」.',
+        polite: '정리해 두었어요. 「' + note + '」'
+      };
+    } else if (kind === 'call_ok') {
+      T = {
+        formal: '「' + target + '」 학생을 호출했습니다.',
+        cute: withInterj(st, target + ' 학생 불러 왔어요~!'),
+        cool: target + ' 호출함.',
+        energetic: withInterj(st, target + ' 불러냈다!'),
+        shy: target + '… 호출해 봤어요…',
+        arrogant: target + ' 정도야 내 호출에 응하겠지.',
+        strict: target + ' 호출 완료.',
+        lazy: target + '… 불렀어…',
+        tsundere: target + ' 불렀으니까… 곧 오겠지!',
+        chaotic: withInterj(st, target + ' 소환~!'),
+        deadpan: target + ' 호출.',
+        polite: target + ' 학생을 호출해 두었어요.'
+      };
+    } else if (kind === 'call_need') {
+      T = {
+        cool: '이름을 붙여. 예: /호출 시로코', deadpan: '이름 필요. /호출 이름',
+        shy: '누, 누구를… 부를까요…?', energetic: '누구 부를지 말해~!',
+        chaotic: '누구 부를지 말해~!', polite: '호출할 학생 이름을 적어 주세요. 예: /호출 시로코',
+        formal: '호출 대상 이름을 입력해 주세요. 예: /호출 시로코'
+      };
+      return T[tone] || T.polite;
+    } else if (kind === 'call_missing') {
+      T = { cool: '「' + arg + '」 못 찾음.', deadpan: '검색 실패.', shy: '「' + arg + '」… 잘 모르겠어요…', polite: '「' + arg + '」 학생을 찾지 못했어요.' };
+      return T[tone] || T.polite;
+    } else if (kind === 'call_locked') {
+      T = { cool: target + ' — 미모집.', polite: target + ' 학생은 아직 모집되지 않았어요.' };
+      return T[tone] || T.polite;
+    } else if (kind === 'who') {
+      T = {
+        formal: '오늘(' + (ctx.date || '') + ') 당번은 ' + memberNames + '입니다.' + (notice ? ' 공지: ' + notice : ''),
+        cute: withInterj(st, '오늘 당번은 ' + memberNames + '예요~!'),
+        cool: '당번: ' + memberNames + '.',
+        energetic: withInterj(st, '오늘 당번 ' + memberNames + ' 출동 중!'),
+        shy: '오, 오늘 당번은… ' + memberNames + '…이에요…',
+        arrogant: '오늘의 당번은 바로 우리, ' + memberNames + '다.',
+        strict: '당번 ' + memberNames + ' 확인.',
+        lazy: '당번? 우리(' + memberNames + ')야…',
+        tsundere: '당번이 누군지 몰라서 물어? ' + memberNames + '야!',
+        chaotic: withInterj(st, '당번 ' + memberNames + '~'),
+        deadpan: '당번 ' + memberNames + '.',
+        polite: '오늘 당번은 ' + memberNames + '입니다.'
+      };
+    } else if (kind === 'called_in') {
+      T = {
+        formal: '집무실 호출을 받았습니다. 잠시 확인 후 복귀하겠습니다.',
+        cute: withInterj(st, '집무실에서 불렀어요? 잠깐만 들를게요~'),
+        cool: '호출 수신. 잠시 합류한다.',
+        energetic: withInterj(st, '호출 받음! 금방 갔다 올게!'),
+        shy: '저… 불려 왔어요… 금방… 돌아갈게요…',
+        arrogant: '흥, 불러서 뭐 하게. 잠깐만이다.',
+        strict: '호출에 응답한다. 용건이 끝나면 복귀한다.',
+        lazy: '불렀어…? 잠깐만…',
+        tsundere: '뭐야, 갑자기 호출은…! 볼일만 보고 갈 거야!',
+        chaotic: withInterj(st, '호출~? 잠깐 놀다 갈게~'),
+        deadpan: '호출 확인. 잠시 합류.',
+        polite: '집무실에서 호출해 주셨군요. 잠시 다녀갈게요.',
+        obsessive: '선생님… 호출해 주셨군요… 바로 갈게요…'
+      };
+    } else {
+      return '처리했습니다.';
+    }
+    return T[tone] || T.polite || T.formal || '처리했습니다.';
+  }
+
   function listDutyCandidates() {
-    var P = getPersonas();
-    var ids = [];
+    var P = getPersonas(); var ids = [];
     Object.keys(P).forEach(function (id) {
       var p = P[id];
       if (!p || p.isGroup || p.isCustom) return;
       if (id === MODE_ID) return;
-      try {
-        if (typeof isStudentOwned === 'function' && !isStudentOwned(id)) return;
-      } catch (e) { return; }
+      if (/^ss_|^gift_|^bgm_|^season_|^none$|^auto$|^default$/.test(id)) return;
+      try { if (typeof isStudentOwned === 'function' && !isStudentOwned(id)) return; } catch (e) { return; }
       ids.push(id);
     });
     return ids;
   }
-
   function shuffle(arr) {
     var a = arr.slice();
     for (var i = a.length - 1; i > 0; i--) {
@@ -23281,122 +23473,74 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
   }
 
   function ensureDuty() {
-    var data = loadDuty();
-    var today = todayStr();
+    var data = loadDuty(); var today = todayStr();
     if (data.date === today && Array.isArray(data.members) && data.members.length) {
-      registerOfficePersona(data);
-      return data;
+      registerOfficePersona(data); return data;
     }
-
     if (data.date && data.date !== today) {
-      pushLog({
-        date: data.date,
-        members: (data.members || []).slice(),
-        memo: data.todayMemo || data.handover || '',
-        closedAt: Date.now()
-      });
+      pushLog({ date: data.date, members: (data.members || []).slice(), memo: data.todayMemo || data.handover || '', closedAt: Date.now() });
     }
-
     var pool = listDutyCandidates();
-    if (!pool.length) {
-      pool = ['arona', 'prana'].filter(function (id) {
-        var P = getPersonas();
-        return !!P[id];
-      });
-    }
+    if (!pool.length) pool = ['arona', 'prana'].filter(function (id) { return !!getPersonas()[id]; });
     var count = pool.length >= 2 ? (Math.random() < 0.55 ? 2 : 1) : 1;
     var picked = shuffle(pool).slice(0, count);
-
     var prevMemo = data.todayMemo || data.handover || '';
     if (!prevMemo && data.members && data.members.length) {
       prevMemo = '이전 당번(' + data.members.map(nameOf).join(', ') + ')이 특별한 메모를 남기지 않았습니다.\n이상 없음.';
     } else if (!prevMemo) {
       prevMemo = '첫 당직입니다. 인수인계 내용 없음.\n선생님 지시를 대기합니다.';
     }
-
-    var next = {
-      date: today,
-      members: picked,
-      handover: prevMemo,
-      todayMemo: '',
-      notice: '',
-      greeted: false
-    };
-    saveDuty(next);
-    registerOfficePersona(next);
-    return next;
+    var next = { date: today, members: picked, handover: prevMemo, todayMemo: '', notice: '', greeted: false };
+    saveDuty(next); registerOfficePersona(next); return next;
   }
 
   function registerOfficePersona(data) {
     var members = (data && data.members) || [];
     var names = members.map(nameOf);
     var sub = names.length ? ('오늘의 당번 · ' + names.join(' · ')) : '당번 대기 중';
-    var greetingLines = members.slice(0, 2).map(function (id) {
-      return '[' + nameOf(id) + '] 선생님, 샬레 집무실입니다. 오늘은 제가 당번이에요.';
+    var greetingLines = members.map(function (id) {
+      var st = getStyle(id); var nm = nameOf(id);
+      if (st.tone === 'cute' || st.tone === 'energetic')
+        return '[' + nm + '] ' + (st.interj ? st.interj + ' ' : '') + '선생님, 샬레 집무실이에요! 오늘은 제가 당번이에요!';
+      if (st.tone === 'cool' || st.tone === 'deadpan') return '[' + nm + '] 집무실이다. 오늘은 당번이다.';
+      if (st.tone === 'shy') return '[' + nm + '] 저… 오늘 당번이에요… 잘… 부탁드려요…';
+      if (st.tone === 'arrogant') return '[' + nm + '] 후후, 오늘의 당번은 나다. 기대해도 좋아.';
+      if (st.tone === 'lazy') return '[' + nm + '] 후아암… 오늘 당번이야… 너무 시키지 마~';
+      if (st.tone === 'chaotic') return '[' + nm + '] ' + (st.interj || '쿠후후') + ', 오늘 당번이야 선생님~';
+      if (st.tone === 'tsundere') return '[' + nm + '] 뭐, 오늘 당번은 나야. 감사할 필요는 없고!';
+      if (st.tone === 'strict') return '[' + nm + '] 선생님, 오늘 당번입니다. 규율에 따라 응대하겠습니다.';
+      return '[' + nm + '] 선생님, 샬레 집무실입니다. 오늘은 제가 당번을 맡았습니다.';
     });
-    if (!greetingLines.length) {
-      greetingLines = ['[시스템] 당번을 배정할 학생이 없습니다. 학생 모집 후 다시 입장해 주세요.'];
-    }
-    if (data && data.handover) {
-      greetingLines.push('[시스템] 📋 인수인계 메모가 있습니다. 상단 「인수인계」에서 확인하세요.');
-    }
-
+    if (!greetingLines.length) greetingLines = ['[시스템] 당번을 배정할 학생이 없습니다.'];
+    if (data && data.handover) greetingLines.push('[시스템] 📋 인수인계 메모가 있습니다. 상단 「인수인계」에서 확인하세요.');
     var persona = {
-      id: MODE_ID,
-      name: '샬레 집무실',
-      title: '샬레 집무실',
-      sub: sub,
-      avatar: '🏛️',
-      isGroup: true,
-      isSchaleOffice: true,
-      noBond: true,
-      members: members.slice(),
-      greeting: greetingLines.join('\n'),
-      prompt: '',
-      theme: {
-        bg: '#0a1220', card: '#121c2e', accent: '#3b82f6', text: '#e8eef7',
-        headerText: '#e8eef7', botBubble: '#1a2740', botText: '#e0e7ff',
-        userBubble: '#1d4ed8', userText: '#ffffff', border: '#243552',
-        avatarBg: 'linear-gradient(135deg, #1e3a8a, #3b82f6)', avatarBorder: '#93c5fd'
-      }
+      id: MODE_ID, name: '샬레 집무실', title: '샬레 집무실', sub: sub, avatar: '🏛️',
+      isGroup: true, isSchaleOffice: true, noBond: true, members: members.slice(),
+      greeting: greetingLines.join('\n'), prompt: '',
+      theme: { bg:'#0a1220',card:'#121c2e',accent:'#3b82f6',text:'#e8eef7',headerText:'#e8eef7',botBubble:'#1a2740',botText:'#e0e7ff',userBubble:'#1d4ed8',userText:'#ffffff',border:'#243552',avatarBg:'linear-gradient(135deg,#1e3a8a,#3b82f6)',avatarBorder:'#93c5fd' }
     };
-
-    try {
-      if (typeof PERSONAS !== 'undefined') PERSONAS[MODE_ID] = persona;
-    } catch (e) {}
-    try {
-      window.PERSONAS = window.PERSONAS || {};
-      window.PERSONAS[MODE_ID] = persona;
-    } catch (e) {}
+    try { if (typeof PERSONAS !== 'undefined') PERSONAS[MODE_ID] = persona; } catch (e) {}
+    try { window.PERSONAS = window.PERSONAS || {}; window.PERSONAS[MODE_ID] = persona; } catch (e) {}
   }
 
   function isInOffice() {
-    try {
-      return (typeof currentMode !== 'undefined' ? currentMode : sg('PRANA_MODE')) === MODE_ID;
-    } catch (e) {
-      return sg('PRANA_MODE') === MODE_ID;
-    }
+    try { return (typeof currentMode !== 'undefined' ? currentMode : sg('PRANA_MODE')) === MODE_ID; }
+    catch (e) { return sg('PRANA_MODE') === MODE_ID; }
   }
-
   function updateBanner() {
-    var banner = document.getElementById('v114-duty-banner');
-    if (!banner) return;
+    var banner = document.getElementById('v114-duty-banner'); if (!banner) return;
     var data = ensureDuty();
     var namesEl = document.getElementById('v114-duty-names');
     if (namesEl) namesEl.textContent = (data.members || []).map(nameOf).join(', ') || '없음';
-    if (isInOffice()) banner.classList.add('show');
-    else banner.classList.remove('show');
+    if (isInOffice()) banner.classList.add('show'); else banner.classList.remove('show');
   }
-
   function placeBanner() {
-    var banner = document.getElementById('v114-duty-banner');
-    var header = document.querySelector('header');
+    var banner = document.getElementById('v114-duty-banner'); var header = document.querySelector('header');
     if (!banner || !header) return;
     if (banner.parentNode !== header.parentNode || banner.previousElementSibling !== header) {
       if (header.parentNode) header.parentNode.insertBefore(banner, header.nextSibling);
     }
   }
-
   function openHandoverModal() {
     try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
     var data = ensureDuty();
@@ -23409,232 +23553,129 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
     if (memo) memo.textContent = data.handover || '인수인계 내용 없음.';
     if (sub) sub.textContent = '날짜 ' + (data.date || todayStr()) + ' · 당번 ' + (data.members || []).map(nameOf).join(', ');
     if (edit) edit.value = data.todayMemo || '';
-    if (hint) {
-      hint.innerHTML = '당번 전용 명령어: <code>/출석</code> <code>/공지 내용</code> <code>/보고</code> <code>/정리</code> <code>/호출 이름</code> <code>/인수인계</code> <code>/당번확인</code>';
-    }
-    m.classList.add('open');
-    m.style.display = 'flex';
+    if (hint) hint.innerHTML = '당번 전용 명령어: <code>/출석</code> <code>/공지 내용</code> <code>/보고</code> <code>/정리</code> <code>/호출 이름</code> <code>/인수인계</code> <code>/당번확인</code>';
+    m.classList.add('open'); m.style.display = 'flex';
   }
-
   function closeHandoverModal() {
     var m = document.getElementById('v114-handover-modal');
     if (m) { m.classList.remove('open'); m.style.display = 'none'; }
   }
-
   function saveTodayMemo() {
     var edit = document.getElementById('v114-ho-edit');
     var text = (edit && edit.value.trim()) || '';
-    var data = ensureDuty();
-    data.todayMemo = text;
-    saveDuty(data);
+    var data = ensureDuty(); data.todayMemo = text; saveDuty(data);
     alert(text ? '오늘 당번 메모를 저장했습니다. 자정 이후 다음 당번에게 인수인계됩니다.' : '메모를 비웠습니다.');
     closeHandoverModal();
   }
-
   function showCommandsHelp() {
     if (typeof appendMessage === 'function') {
-      appendMessage(
-        '시스템',
-        '🏛️ 샬레 집무실 당번 명령어\n' +
-        '· /출석 — 오늘 출석 상태 보고\n' +
-        '· /공지 [내용] — 집무실 공지 등록\n' +
-        '· /보고 — 당번이 현황 보고\n' +
-        '· /정리 — 간단 정리 완료 기록\n' +
-        '· /호출 [이름] — 다른 학생 임시 호출\n' +
-        '· /인수인계 — 인수인계 메모 열기\n' +
-        '· /당번확인 — 오늘 당번·공지 확인\n\n' +
-        '※ 집무실에서만 동작합니다.',
-        true, '시스템', null, { hideActions: true }
-      );
+      appendMessage('시스템',
+        '🏛️ 샬레 집무실 당번 명령어\n· /출석 · /공지 [내용] · /보고 · /정리 [내용]\n· /호출 [이름] · /인수인계 · /당번확인\n\n※ 대사는 당번 캐릭터 말투에 맞춰 나갑니다.',
+        true, '시스템', null, { hideActions: true });
       try { if (typeof saveConversation === 'function') saveConversation(); } catch (e) {}
-    } else {
-      alert('/출석 /공지 /보고 /정리 /호출 /인수인계 /당번확인');
     }
   }
-
-  function dutyReply(lines) {
-    var data = ensureDuty();
-    var members = data.members || [];
+  function ctxFromDuty(data, extra) {
+    var owned = 0;
+    try { var raw = sg('PRANA_OWNED_STUDENTS'); var arr = raw ? JSON.parse(raw) : []; if (Array.isArray(arr)) owned = arr.length; } catch (e) {}
+    var o = { notice: data.notice || '', owned: owned, members: data.members || [], hasMemo: !!(data.todayMemo && String(data.todayMemo).trim()), date: data.date || todayStr() };
+    if (extra) Object.keys(extra).forEach(function (k) { o[k] = extra[k]; });
+    return o;
+  }
+  function dutySpeak(kind, extra) {
+    var data = ensureDuty(); var members = data.members || []; var ctx = ctxFromDuty(data, extra);
     if (!members.length) {
-      if (typeof appendMessage === 'function') {
-        appendMessage('시스템', lines.join('\n'), true, '시스템', null, { hideActions: true });
-      }
+      if (typeof appendMessage === 'function') appendMessage('시스템', '당번이 배정되지 않았습니다.', true, '시스템', null, { hideActions: true });
       return;
     }
-    if (members.length === 1) {
-      if (typeof appendMessage === 'function') {
-        appendMessage(nameOf(members[0]), lines.join('\n'), true, nameOf(members[0]), null, { hideActions: true });
+    members.forEach(function (id, idx) {
+      var text = lineFor(id, kind, ctx);
+      if (idx > 0 && (kind === 'attend' || kind === 'report' || kind === 'who')) {
+        var st = getStyle(id);
+        if (st.tone === 'cool' || st.tone === 'deadpan') text = '동의.';
+        else if (st.tone === 'shy') text = '저, 저도… 같은 의견이에요…';
+        else if (st.tone === 'chaotic') text = (st.interj || '쿠후후') + ', 맞아 맞아~';
+        else if (st.tone === 'lazy') text = '어… 맞아…';
+        else if (st.tone === 'tsundere') text = '뭐, 틀린 말은 아니지…';
+        else if (st.tone === 'energetic' || st.tone === 'cute') text = '저도 확인했어요!';
+        else if (st.tone === 'arrogant') text = '물론이다.';
+        else text = '함께 확인했습니다.';
       }
-    } else {
-      lines.forEach(function (line, idx) {
-        var who = members[idx % members.length];
-        if (typeof appendMessage === 'function') {
-          appendMessage(nameOf(who), line, true, nameOf(who), null, { hideActions: true });
-        }
-      });
-    }
+      if (typeof appendMessage === 'function') appendMessage(nameOf(id), text, true, nameOf(id), null, { hideActions: true });
+    });
     try { if (typeof saveConversation === 'function') saveConversation(); } catch (e) {}
   }
-
   function handleCommand(raw) {
     var text = String(raw || '').trim();
-    if (!text.startsWith('/')) return false;
-    if (!isInOffice()) return false;
-
+    if (!text.startsWith('/') || !isInOffice()) return false;
     var data = ensureDuty();
-    var parts = text.split(/\s+/);
-    var cmd = parts[0].replace(/^\//, '').toLowerCase();
+    var cmd = text.split(/\s+/)[0].replace(/^\//, '').toLowerCase();
     var arg = text.replace(/^\/\S+\s*/, '').trim();
-
-    if (cmd === '출석' || cmd === '출석체크') {
-      var owned = 0;
-      try {
-        var rawOwned = sg('PRANA_OWNED_STUDENTS');
-        var arr = rawOwned ? JSON.parse(rawOwned) : [];
-        if (Array.isArray(arr)) owned = arr.length;
-      } catch (e) {}
-      dutyReply([
-        '출석 보고드립니다. 모집 학생 수 약 ' + owned + '명으로 확인됩니다.',
-        data.notice ? '현재 공지: ' + data.notice : '등록된 공지는 없습니다.'
-      ]);
-      return true;
-    }
-
+    if (cmd === '출석' || cmd === '출석체크') { dutySpeak('attend'); return true; }
     if (cmd === '공지') {
-      if (!arg) {
-        dutyReply([data.notice ? '현재 공지: ' + data.notice : '공지 내용이 비어 있습니다. /공지 [내용] 으로 등록해 주세요.']);
-        return true;
-      }
-      data.notice = arg;
-      saveDuty(data);
-      ss(NOTICE_KEY, arg);
-      dutyReply(['공지를 등록했습니다: 「' + arg + '」']);
-      return true;
+      if (!arg) { dutySpeak('notice_empty'); return true; }
+      data.notice = arg; saveDuty(data); ss(NOTICE_KEY, arg);
+      dutySpeak('notice_set', { arg: arg }); return true;
     }
-
-    if (cmd === '보고') {
-      dutyReply([
-        '현황 보고드립니다.',
-        '당번: ' + (data.members || []).map(nameOf).join(', '),
-        data.notice ? '공지: ' + data.notice : '공지 없음',
-        data.todayMemo ? '당번 메모 작성됨' : '당번 메모 미작성',
-        '지시 사항 있으시면 말씀해 주세요.'
-      ]);
-      return true;
-    }
-
+    if (cmd === '보고') { dutySpeak('report'); return true; }
     if (cmd === '정리') {
       var note = arg || '집무실 간단 정리 완료';
       data.todayMemo = (data.todayMemo ? data.todayMemo + '\n' : '') + '· ' + note + ' (' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ')';
-      saveDuty(data);
-      dutyReply(['정리 반영했습니다. 「' + note + '」']);
-      return true;
+      saveDuty(data); dutySpeak('tidy', { arg: note }); return true;
     }
-
     if (cmd === '호출') {
-      if (!arg) {
-        dutyReply(['호출할 학생 이름을 적어 주세요. 예: /호출 시로코']);
-        return true;
-      }
-      var P = getPersonas();
-      var found = null;
+      if (!arg) { dutySpeak('call_need'); return true; }
+      var P = getPersonas(); var found = null;
       Object.keys(P).forEach(function (id) {
-        var p = P[id];
-        if (!p || p.isGroup) return;
-        if (p.name === arg || id === arg || (p.name && p.name.indexOf(arg) >= 0)) {
-          if (!found) found = id;
-        }
+        var p = P[id]; if (!p || p.isGroup) return;
+        if (p.name === arg || id === arg || (p.name && p.name.indexOf(arg) >= 0)) { if (!found) found = id; }
       });
-      if (!found) {
-        dutyReply(['「' + arg + '」 학생을 찾지 못했습니다.']);
-        return true;
-      }
+      if (!found) { dutySpeak('call_missing', { arg: arg }); return true; }
       try {
         if (typeof isStudentOwned === 'function' && !isStudentOwned(found)) {
-          dutyReply([nameOf(found) + ' 학생은 아직 모집되지 않았습니다.']);
-          return true;
+          dutySpeak('call_locked', { targetName: nameOf(found) }); return true;
         }
       } catch (e) {}
       if (typeof appendMessage === 'function') {
-        appendMessage(
-          nameOf(found),
-          '집무실 호출을 받았습니다. 잠시 들렀다 갈게요. 볼일 끝나면 돌아가겠습니다.',
-          true, nameOf(found), null, { hideActions: true }
-        );
-        try { if (typeof saveConversation === 'function') saveConversation(); } catch (e) {}
+        appendMessage(nameOf(found), lineFor(found, 'called_in', {}), true, nameOf(found), null, { hideActions: true });
       }
-      dutyReply(['「' + nameOf(found) + '」 학생을 호출했습니다.']);
-      return true;
+      dutySpeak('call_ok', { targetName: nameOf(found) }); return true;
     }
-
-    if (cmd === '인수인계') {
-      openHandoverModal();
-      return true;
-    }
-
-    if (cmd === '당번확인' || cmd === '당번') {
-      dutyReply([
-        '오늘(' + data.date + ') 당번: ' + (data.members || []).map(nameOf).join(', '),
-        data.notice ? '공지: ' + data.notice : '공지 없음',
-        '인수인계는 상단 버튼 또는 /인수인계 로 확인할 수 있습니다.'
-      ]);
-      return true;
-    }
-
+    if (cmd === '인수인계') { openHandoverModal(); return true; }
+    if (cmd === '당번확인' || cmd === '당번') { dutySpeak('who'); return true; }
     return false;
   }
-
   function enterOffice() {
     ensureDuty();
     try {
       if (typeof switchMode === 'function') switchMode(MODE_ID);
-      else {
-        try { currentMode = MODE_ID; } catch (e) {}
-        ss('PRANA_MODE', MODE_ID);
-        if (typeof initChat === 'function') initChat();
-      }
-    } catch (e) {
-      alert('집무실 입장 실패: ' + (e.message || e));
-    }
+      else { try { currentMode = MODE_ID; } catch (e) {} ss('PRANA_MODE', MODE_ID); if (typeof initChat === 'function') initChat(); }
+    } catch (e) { alert('집무실 입장 실패: ' + (e.message || e)); }
     setTimeout(function () {
       updateBanner();
       var data = loadDuty();
-      if (data && !data.greeted && isInOffice()) {
-        data.greeted = true;
-        saveDuty(data);
-      }
+      if (data && !data.greeted && isInOffice()) { data.greeted = true; saveDuty(data); }
     }, 400);
   }
-
   function patchOwned() {
-    if (typeof window.isStudentOwned !== 'function') return;
-    if (window.isStudentOwned.__v114) return;
+    if (typeof window.isStudentOwned !== 'function' || window.isStudentOwned.__v114) return;
     var prev = window.isStudentOwned;
-    var wrapped = function (id) {
-      if (id === MODE_ID) return true;
-      return prev.apply(this, arguments);
-    };
-    wrapped.__v114 = true;
-    window.isStudentOwned = wrapped;
+    var wrapped = function (id) { if (id === MODE_ID) return true; return prev.apply(this, arguments); };
+    wrapped.__v114 = true; window.isStudentOwned = wrapped;
   }
-
   function installSendHook() {
-    if (typeof window.sendMessage !== 'function') return;
-    if (window.sendMessage.__v114schale) return;
+    if (typeof window.sendMessage !== 'function' || window.sendMessage.__v114schale) return;
     var prev = window.sendMessage;
     var wrapped = async function () {
       try {
         if (isInOffice()) {
           var input = document.getElementById('user-input');
           var text = input ? input.value.trim() : '';
-          if (text.startsWith('/')) {
-            var handled = handleCommand(text);
-            if (handled) {
-              if (input) input.value = '';
-              var sendBtn = document.getElementById('send-btn');
-              if (sendBtn) sendBtn.disabled = false;
-              return;
-            }
+          if (text.startsWith('/') && handleCommand(text)) {
+            if (input) input.value = '';
+            var sendBtn = document.getElementById('send-btn');
+            if (sendBtn) sendBtn.disabled = false;
+            return;
           }
         }
       } catch (e) {}
@@ -23647,7 +23688,6 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
     window.sendMessage = wrapped;
     try { sendMessage = wrapped; } catch (e) {}
   }
-
   function installModeWatch() {
     if (window.__v114modeWatch) return;
     window.__v114modeWatch = true;
@@ -23655,26 +23695,17 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
     setInterval(function () {
       try {
         var mode = (typeof currentMode !== 'undefined') ? currentMode : sg('PRANA_MODE');
-        if (mode !== last) {
-          last = mode;
-          ensureDuty();
-          updateBanner();
-        } else if (mode === MODE_ID) {
-          updateBanner();
-        }
+        if (mode !== last) { last = mode; ensureDuty(); updateBanner(); }
+        else if (mode === MODE_ID) updateBanner();
       } catch (e) {}
     }, 1500);
   }
-
   function injectMenu() {
     var list = document.querySelector('#main-menu-modal .menu-list') ||
       (typeof window.__pranaGetMenuList === 'function' ? window.__pranaGetMenuList() : null);
-    if (!list) return;
-    if (document.getElementById('menu-v114-schale')) return;
+    if (!list || document.getElementById('menu-v114-schale')) return;
     var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.id = 'menu-v114-schale';
-    btn.className = 'menu-item-btn';
+    btn.type = 'button'; btn.id = 'menu-v114-schale'; btn.className = 'menu-item-btn';
     btn.setAttribute('data-search', '샬레 집무실 당번 인수인계 schale office duty');
     btn.textContent = '🏛️ 샬레 집무실';
     btn.onclick = function () {
@@ -23683,45 +23714,24 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
     };
     list.insertBefore(btn, list.firstChild);
   }
-
   function boot() {
-    patchOwned();
-    ensureDuty();
-    placeBanner();
-    updateBanner();
-    installSendHook();
-    installModeWatch();
-    injectMenu();
-
-    var bHo = document.getElementById('v114-btn-handover');
-    if (bHo) bHo.onclick = openHandoverModal;
-    var bCmd = document.getElementById('v114-btn-cmds');
-    if (bCmd) bCmd.onclick = showCommandsHelp;
-    var hoClose = document.getElementById('v114-ho-close');
-    if (hoClose) hoClose.onclick = closeHandoverModal;
-    var hoSave = document.getElementById('v114-ho-save');
-    if (hoSave) hoSave.onclick = saveTodayMemo;
+    patchOwned(); ensureDuty(); placeBanner(); updateBanner();
+    installSendHook(); installModeWatch(); injectMenu();
+    var bHo = document.getElementById('v114-btn-handover'); if (bHo) bHo.onclick = openHandoverModal;
+    var bCmd = document.getElementById('v114-btn-cmds'); if (bCmd) bCmd.onclick = showCommandsHelp;
+    var hoClose = document.getElementById('v114-ho-close'); if (hoClose) hoClose.onclick = closeHandoverModal;
+    var hoSave = document.getElementById('v114-ho-save'); if (hoSave) hoSave.onclick = saveTodayMemo;
     var modal = document.getElementById('v114-handover-modal');
     if (modal && !modal.__wired) {
       modal.__wired = true;
       modal.addEventListener('click', function (ev) { if (ev.target === modal) closeHandoverModal(); });
     }
-
-    setInterval(function () {
-      patchOwned();
-      ensureDuty();
-      placeBanner();
-      installSendHook();
-      injectMenu();
-    }, 7000);
-
-    console.log('[PRANA] v11.4 Schale Office · Duty · Handover ready');
+    setInterval(function () { patchOwned(); ensureDuty(); placeBanner(); installSendHook(); injectMenu(); }, 7000);
+    console.log('[PRANA] v11.4 Schale Office · character voice ready');
   }
-
   window.openV114SchaleOffice = enterOffice;
   window.openV114Handover = openHandoverModal;
   window.__v114EnsureDuty = ensureDuty;
-
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
