@@ -813,6 +813,9 @@
     .v75-ambiance-layer {
       pointer-events: none; position: fixed; inset: 0; z-index: 0; overflow: hidden;
       opacity: 0; transition: opacity 0.6s;
+      contain: strict;
+      transform: translateZ(0);
+      backface-visibility: hidden;
     }
     body.v75-ambiance-on .v75-ambiance-layer { opacity: 1; }
     body.v75-ambiance-on header,
@@ -824,12 +827,16 @@
       position: absolute; border-radius: 50%;
       background: var(--accent-color); opacity: 0.18;
       animation: v75-float linear infinite;
+      will-change: transform, opacity;
+      transform: translate3d(0, 110vh, 0) scale(0.6);
+      backface-visibility: hidden;
+      contain: layout style;
     }
     @keyframes v75-float {
-      0% { transform: translateY(110vh) scale(0.6); opacity: 0; }
+      0% { transform: translate3d(0, 110vh, 0) scale(0.6); opacity: 0; }
       15% { opacity: 0.22; }
       85% { opacity: 0.12; }
-      100% { transform: translateY(-10vh) scale(1.1); opacity: 0; }
+      100% { transform: translate3d(0, -10vh, 0) scale(1.1); opacity: 0; }
     }
     .v75-time-tint {
       position: absolute; inset: 0;
@@ -6213,9 +6220,10 @@ ${bondNote}
   if (['low','mid','high'].indexOf(ambianceDensity) < 0) ambianceDensity = 'mid';
 
   function particleCountForDensity() {
-    if (ambianceDensity === 'low') return 8;
-    if (ambianceDensity === 'high') return 28;
-    return 14;
+    // 끊김 완화: 입자 수 하향 (속도 설정은 동일)
+    if (ambianceDensity === 'low') return 5;
+    if (ambianceDensity === 'high') return 14;
+    return 9;
   }
   function sizeRangeFor() {
     if (ambianceSize === 'small') return [2, 4];
@@ -20980,7 +20988,7 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
     var close = getEl('prana-modes-close'); if (close) close.onclick = closeModesModal;
     var modal = getEl('prana-modes-modal'); if (modal) modal.addEventListener('click', function (e) { if (e.target === modal) closeModesModal(); });
     installMenuButton(); installSendGuard(); updateStatus();
-    setInterval(function () { installMenuButton(); installSendGuard(); updateStatus(); }, 1000);
+    setInterval(function () { installMenuButton(); installSendGuard(); updateStatus(); }, 5000);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
@@ -24201,12 +24209,8 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
     injectMenu();
     installHackHook();
     patchBondTicket();
-    // 메뉴 버튼만 드물게 재주입 (스캔·DOM 순회 없음)
-    setInterval(function () {
-      injectMenu();
-      patchBondTicket();
-    }, 20000);
-    console.log('[PRANA] v11.5e 용대석 + icons in shop only (no DOM scan)');
+    // 타이머 없음 — 부팅 시 1회만 (끊김 최소화)
+    console.log('[PRANA] v11.5f zero timers, GPU ambiance, shop icons only');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
