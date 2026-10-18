@@ -24104,18 +24104,29 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
   /* 정적 HTML 이모지 → 아이콘 이미지 치환 */
   function replaceEmojisIn(el) {
     if (!el || el.nodeType !== 1) return;
+    if (el.id === 'v75-ambiance-layer' || (el.classList && el.classList.contains('v75-particle'))) return;
     if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') return;
-    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (node) {
+        var p = node.parentNode;
+        if (!p || p.nodeType !== 1) return NodeFilter.FILTER_REJECT;
+        if (p.closest && p.closest('#v75-ambiance-layer, script, style, textarea, input, .v75-particle, .v115-cur-label, .v115-cur-icon')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        var t = node.nodeValue || '';
+        if (t.indexOf('💎') < 0 && t.indexOf('🪙') < 0 && t.indexOf('🎫') < 0 && t.indexOf('✨') < 0) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
     var nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     nodes.forEach(function (tn) {
       if (!tn.parentNode) return;
       var p = tn.parentNode;
-      if (p.closest && p.closest('script,style,textarea,input')) return;
-      if (p.classList && p.classList.contains('v115-cur-label')) return;
       var t = tn.nodeValue;
       if (!t) return;
-      if (t.indexOf('💎') < 0 && t.indexOf('🪙') < 0 && t.indexOf('🎫') < 0 && t.indexOf('✨') < 0) return;
       var html = t
         .replace(/💎/g, iconImg('pyroxene', 16))
         .replace(/🪙/g, iconImg('credits', 16))
@@ -24131,26 +24142,45 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
 
   function scanIcons() {
     try {
-      replaceEmojisIn(document.body);
+      // 모달·메뉴만 스캔 (전체 body / 분위기 레이어는 제외 → 애니메이션 끊김 방지)
+      var roots = [
+        document.getElementById('main-menu-modal'),
+        document.getElementById('gacha-modal'),
+        document.getElementById('shop-modal'),
+        document.getElementById('bond-build-modal'),
+        document.getElementById('quiz-modal'),
+        document.getElementById('daily-modal'),
+        document.getElementById('eligma-shop-modal'),
+        document.getElementById('setting-shop-modal'),
+        document.getElementById('ambiance-modal'),
+        document.getElementById('v115-yd-modal')
+      ];
+      roots.forEach(function (r) { if (r) replaceEmojisIn(r); });
     } catch (e) {}
   }
 
-  /* MutationObserver: 동적으로 추가되는 텍스트도 치환 */
+  /* MutationObserver: 분위기 레이어 제외, 모달 위주 */
   function watchDOM() {
     if (window.__v115Observer) return;
     try {
       var obs = new MutationObserver(function (muts) {
         var need = false;
-        muts.forEach(function (m) {
-          if (m.type === 'childList' && m.addedNodes.length) need = true;
-          if (m.type === 'characterData') need = true;
-        });
+        for (var i = 0; i < muts.length; i++) {
+          var m = muts[i];
+          if (m.type !== 'childList' || !m.addedNodes.length) continue;
+          var t = m.target;
+          if (t && t.id === 'v75-ambiance-layer') continue;
+          if (t && t.classList && t.classList.contains('v75-particle')) continue;
+          if (t && t.closest && t.closest('#v75-ambiance-layer')) continue;
+          need = true;
+          break;
+        }
         if (need) {
           clearTimeout(window.__v115ScanTimer);
-          window.__v115ScanTimer = setTimeout(scanIcons, 80);
+          window.__v115ScanTimer = setTimeout(scanIcons, 200);
         }
       });
-      obs.observe(document.body, { childList: true, subtree: true, characterData: true });
+      obs.observe(document.body, { childList: true, subtree: true, characterData: false });
       window.__v115Observer = obs;
     } catch (e) {}
   }
@@ -24166,8 +24196,8 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
       injectMenu();
       patchBondTicket();
       scanIcons();
-    }, 3000);
-    console.log('[PRANA] v11.5b Currency icons + 용대석 ready');
+    }, 8000);
+    console.log('[PRANA] v11.5c Currency icons + 용대석 (ambiance-safe)');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
