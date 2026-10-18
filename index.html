@@ -23127,4 +23127,604 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
 })();
 </script>
 
+<!-- v11.4 Schale Office -->
+<style id="v114-style">
+#v114-duty-banner{
+  display:none;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
+  padding:8px 14px;font-size:12px;font-weight:600;
+  background:linear-gradient(90deg,#1e3a5f55,#4c1d9555);
+  border-bottom:1px solid var(--border-color);color:var(--text-color);flex-shrink:0;
+}
+#v114-duty-banner.show{display:flex}
+#v114-duty-banner .duty-names{color:var(--accent-color);font-weight:800}
+#v114-duty-banner button{
+  border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);
+  border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;
+}
+#v114-duty-banner button:active{border-color:var(--accent-color);transform:scale(.96)}
+#v114-handover-modal{
+  display:none;position:fixed;inset:0;z-index:10080;background:rgba(0,0,0,.8);
+  align-items:center;justify-content:center;padding:16px;box-sizing:border-box;
+}
+#v114-handover-modal.open{display:flex!important}
+.v114-box{
+  background:var(--card-bg,#151a24);border:1px solid var(--border-color,#2a3447);border-radius:14px;
+  width:100%;max-width:400px;max-height:85vh;display:flex;flex-direction:column;color:var(--text-color,#e0e6ed);overflow:hidden;
+}
+.v114-box .head{padding:14px 16px 8px;text-align:center;flex-shrink:0}
+.v114-box .head h3{margin:0 0 4px;font-size:16px}
+.v114-box .head p{margin:0;font-size:11px;color:#8a9bb0;line-height:1.4}
+.v114-body{flex:1;overflow-y:auto;padding:12px 14px;-webkit-overflow-scrolling:touch}
+.v114-foot{padding:10px 14px;border-top:1px solid var(--border-color);flex-shrink:0}
+.v114-btn{width:100%;padding:10px;border:none;border-radius:8px;background:var(--accent-color,#8a2be2);color:#fff;font-weight:700;cursor:pointer;font-size:13px;margin-top:6px}
+.v114-btn.gray{background:#334155}
+.v114-memo{
+  background:var(--bg-color);border:1px solid var(--border-color);border-radius:10px;
+  padding:12px;font-size:13px;line-height:1.55;white-space:pre-wrap;min-height:80px;
+}
+.v114-cmd-hint{font-size:11px;color:#8a9bb0;line-height:1.5;margin-top:10px}
+.v114-cmd-hint code{font-size:11px;color:var(--accent-color);background:var(--bg-color);padding:1px 5px;border-radius:4px}
+.char-item .v114-duty-badge{
+  font-size:10px;font-weight:800;color:#67e8f9;border:1px solid #67e8f9;
+  border-radius:999px;padding:1px 7px;margin-left:4px;
+}
+</style>
+
+<div id="v114-duty-banner">
+  <div>🏛️ 오늘의 당번: <span class="duty-names" id="v114-duty-names">—</span></div>
+  <div style="display:flex;gap:6px;">
+    <button type="button" id="v114-btn-handover">인수인계</button>
+    <button type="button" id="v114-btn-cmds">명령어</button>
+  </div>
+</div>
+
+<div id="v114-handover-modal">
+  <div class="v114-box">
+    <div class="head">
+      <h3>📋 인수인계 메모</h3>
+      <p id="v114-ho-sub">이전 당번이 남긴 기록</p>
+    </div>
+    <div class="v114-body">
+      <div class="v114-memo" id="v114-ho-memo">아직 인수인계 내용이 없습니다.</div>
+      <p class="v114-cmd-hint" id="v114-ho-hint"></p>
+      <label style="display:block;font-size:12px;font-weight:700;color:#8a9bb0;margin:12px 0 6px;">오늘 당번 메모 작성 / 수정</label>
+      <textarea id="v114-ho-edit" rows="4" placeholder="오늘 처리한 일, 특이사항, 선생님 지시 등을 남겨 주세요." style="width:100%;padding:10px;background:var(--bg-color);border:1px solid var(--border-color);color:var(--text-color);border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;resize:vertical;"></textarea>
+    </div>
+    <div class="v114-foot">
+      <button type="button" class="v114-btn" id="v114-ho-save">메모 저장</button>
+      <button type="button" class="v114-btn gray" id="v114-ho-close">닫기</button>
+    </div>
+  </div>
+</div>
+
+<script id="v114-schale-office">
+/* v11.4: 샬레 집무실 · 오늘의 당번 · 전용 권한 · 인수인계 */
+(function () {
+  'use strict';
+  if (window.__PRANA_V114__) return;
+  window.__PRANA_V114__ = true;
+
+  var MODE_ID = 'schale_office';
+  var DUTY_KEY = 'PRANA_SCHALE_DUTY';
+  var LOG_KEY = 'PRANA_SCHALE_HANDOVER_LOG';
+  var NOTICE_KEY = 'PRANA_SCHALE_NOTICE';
+
+  function sg(k) {
+    try { return (typeof safeGet === 'function') ? safeGet(k) : (localStorage.getItem(k) || ''); }
+    catch (e) { return ''; }
+  }
+  function ss(k, v) {
+    try { if (typeof safeSet === 'function') safeSet(k, v); else localStorage.setItem(k, String(v)); }
+    catch (e) {}
+  }
+
+  function todayStr() {
+    var d = new Date();
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
+  function loadDuty() {
+    try {
+      var o = JSON.parse(sg(DUTY_KEY) || '{}');
+      return (o && typeof o === 'object') ? o : {};
+    } catch (e) { return {}; }
+  }
+  function saveDuty(o) { ss(DUTY_KEY, JSON.stringify(o || {})); }
+
+  function loadLog() {
+    try {
+      var a = JSON.parse(sg(LOG_KEY) || '[]');
+      return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+  }
+  function pushLog(entry) {
+    var log = loadLog();
+    log.unshift(entry);
+    if (log.length > 7) log = log.slice(0, 7);
+    ss(LOG_KEY, JSON.stringify(log));
+  }
+
+  function getPersonas() {
+    return window.PERSONAS || (typeof PERSONAS !== 'undefined' ? PERSONAS : {}) || {};
+  }
+
+  function nameOf(id) {
+    var P = getPersonas();
+    return (P[id] && P[id].name) || id;
+  }
+
+  function listDutyCandidates() {
+    var P = getPersonas();
+    var ids = [];
+    Object.keys(P).forEach(function (id) {
+      var p = P[id];
+      if (!p || p.isGroup || p.isCustom) return;
+      if (id === MODE_ID) return;
+      try {
+        if (typeof isStudentOwned === 'function' && !isStudentOwned(id)) return;
+      } catch (e) { return; }
+      ids.push(id);
+    });
+    return ids;
+  }
+
+  function shuffle(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  function ensureDuty() {
+    var data = loadDuty();
+    var today = todayStr();
+    if (data.date === today && Array.isArray(data.members) && data.members.length) {
+      registerOfficePersona(data);
+      return data;
+    }
+
+    if (data.date && data.date !== today) {
+      pushLog({
+        date: data.date,
+        members: (data.members || []).slice(),
+        memo: data.todayMemo || data.handover || '',
+        closedAt: Date.now()
+      });
+    }
+
+    var pool = listDutyCandidates();
+    if (!pool.length) {
+      pool = ['arona', 'prana'].filter(function (id) {
+        var P = getPersonas();
+        return !!P[id];
+      });
+    }
+    var count = pool.length >= 2 ? (Math.random() < 0.55 ? 2 : 1) : 1;
+    var picked = shuffle(pool).slice(0, count);
+
+    var prevMemo = data.todayMemo || data.handover || '';
+    if (!prevMemo && data.members && data.members.length) {
+      prevMemo = '이전 당번(' + data.members.map(nameOf).join(', ') + ')이 특별한 메모를 남기지 않았습니다.\n이상 없음.';
+    } else if (!prevMemo) {
+      prevMemo = '첫 당직입니다. 인수인계 내용 없음.\n선생님 지시를 대기합니다.';
+    }
+
+    var next = {
+      date: today,
+      members: picked,
+      handover: prevMemo,
+      todayMemo: '',
+      notice: '',
+      greeted: false
+    };
+    saveDuty(next);
+    registerOfficePersona(next);
+    return next;
+  }
+
+  function registerOfficePersona(data) {
+    var members = (data && data.members) || [];
+    var names = members.map(nameOf);
+    var sub = names.length ? ('오늘의 당번 · ' + names.join(' · ')) : '당번 대기 중';
+    var greetingLines = members.slice(0, 2).map(function (id) {
+      return '[' + nameOf(id) + '] 선생님, 샬레 집무실입니다. 오늘은 제가 당번이에요.';
+    });
+    if (!greetingLines.length) {
+      greetingLines = ['[시스템] 당번을 배정할 학생이 없습니다. 학생 모집 후 다시 입장해 주세요.'];
+    }
+    if (data && data.handover) {
+      greetingLines.push('[시스템] 📋 인수인계 메모가 있습니다. 상단 「인수인계」에서 확인하세요.');
+    }
+
+    var persona = {
+      id: MODE_ID,
+      name: '샬레 집무실',
+      title: '샬레 집무실',
+      sub: sub,
+      avatar: '🏛️',
+      isGroup: true,
+      isSchaleOffice: true,
+      noBond: true,
+      members: members.slice(),
+      greeting: greetingLines.join('\n'),
+      prompt: '',
+      theme: {
+        bg: '#0a1220', card: '#121c2e', accent: '#3b82f6', text: '#e8eef7',
+        headerText: '#e8eef7', botBubble: '#1a2740', botText: '#e0e7ff',
+        userBubble: '#1d4ed8', userText: '#ffffff', border: '#243552',
+        avatarBg: 'linear-gradient(135deg, #1e3a8a, #3b82f6)', avatarBorder: '#93c5fd'
+      }
+    };
+
+    try {
+      if (typeof PERSONAS !== 'undefined') PERSONAS[MODE_ID] = persona;
+    } catch (e) {}
+    try {
+      window.PERSONAS = window.PERSONAS || {};
+      window.PERSONAS[MODE_ID] = persona;
+    } catch (e) {}
+  }
+
+  function isInOffice() {
+    try {
+      return (typeof currentMode !== 'undefined' ? currentMode : sg('PRANA_MODE')) === MODE_ID;
+    } catch (e) {
+      return sg('PRANA_MODE') === MODE_ID;
+    }
+  }
+
+  function updateBanner() {
+    var banner = document.getElementById('v114-duty-banner');
+    if (!banner) return;
+    var data = ensureDuty();
+    var namesEl = document.getElementById('v114-duty-names');
+    if (namesEl) namesEl.textContent = (data.members || []).map(nameOf).join(', ') || '없음';
+    if (isInOffice()) banner.classList.add('show');
+    else banner.classList.remove('show');
+  }
+
+  function placeBanner() {
+    var banner = document.getElementById('v114-duty-banner');
+    var header = document.querySelector('header');
+    if (!banner || !header) return;
+    if (banner.parentNode !== header.parentNode || banner.previousElementSibling !== header) {
+      if (header.parentNode) header.parentNode.insertBefore(banner, header.nextSibling);
+    }
+  }
+
+  function openHandoverModal() {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    var data = ensureDuty();
+    var m = document.getElementById('v114-handover-modal');
+    var memo = document.getElementById('v114-ho-memo');
+    var sub = document.getElementById('v114-ho-sub');
+    var edit = document.getElementById('v114-ho-edit');
+    var hint = document.getElementById('v114-ho-hint');
+    if (!m) return;
+    if (memo) memo.textContent = data.handover || '인수인계 내용 없음.';
+    if (sub) sub.textContent = '날짜 ' + (data.date || todayStr()) + ' · 당번 ' + (data.members || []).map(nameOf).join(', ');
+    if (edit) edit.value = data.todayMemo || '';
+    if (hint) {
+      hint.innerHTML = '당번 전용 명령어: <code>/출석</code> <code>/공지 내용</code> <code>/보고</code> <code>/정리</code> <code>/호출 이름</code> <code>/인수인계</code> <code>/당번확인</code>';
+    }
+    m.classList.add('open');
+    m.style.display = 'flex';
+  }
+
+  function closeHandoverModal() {
+    var m = document.getElementById('v114-handover-modal');
+    if (m) { m.classList.remove('open'); m.style.display = 'none'; }
+  }
+
+  function saveTodayMemo() {
+    var edit = document.getElementById('v114-ho-edit');
+    var text = (edit && edit.value.trim()) || '';
+    var data = ensureDuty();
+    data.todayMemo = text;
+    saveDuty(data);
+    alert(text ? '오늘 당번 메모를 저장했습니다. 자정 이후 다음 당번에게 인수인계됩니다.' : '메모를 비웠습니다.');
+    closeHandoverModal();
+  }
+
+  function showCommandsHelp() {
+    if (typeof appendMessage === 'function') {
+      appendMessage(
+        '시스템',
+        '🏛️ 샬레 집무실 당번 명령어\n' +
+        '· /출석 — 오늘 출석 상태 보고\n' +
+        '· /공지 [내용] — 집무실 공지 등록\n' +
+        '· /보고 — 당번이 현황 보고\n' +
+        '· /정리 — 간단 정리 완료 기록\n' +
+        '· /호출 [이름] — 다른 학생 임시 호출\n' +
+        '· /인수인계 — 인수인계 메모 열기\n' +
+        '· /당번확인 — 오늘 당번·공지 확인\n\n' +
+        '※ 집무실에서만 동작합니다.',
+        true, '시스템', null, { hideActions: true }
+      );
+      try { if (typeof saveConversation === 'function') saveConversation(); } catch (e) {}
+    } else {
+      alert('/출석 /공지 /보고 /정리 /호출 /인수인계 /당번확인');
+    }
+  }
+
+  function dutyReply(lines) {
+    var data = ensureDuty();
+    var members = data.members || [];
+    if (!members.length) {
+      if (typeof appendMessage === 'function') {
+        appendMessage('시스템', lines.join('\n'), true, '시스템', null, { hideActions: true });
+      }
+      return;
+    }
+    if (members.length === 1) {
+      if (typeof appendMessage === 'function') {
+        appendMessage(nameOf(members[0]), lines.join('\n'), true, nameOf(members[0]), null, { hideActions: true });
+      }
+    } else {
+      lines.forEach(function (line, idx) {
+        var who = members[idx % members.length];
+        if (typeof appendMessage === 'function') {
+          appendMessage(nameOf(who), line, true, nameOf(who), null, { hideActions: true });
+        }
+      });
+    }
+    try { if (typeof saveConversation === 'function') saveConversation(); } catch (e) {}
+  }
+
+  function handleCommand(raw) {
+    var text = String(raw || '').trim();
+    if (!text.startsWith('/')) return false;
+    if (!isInOffice()) return false;
+
+    var data = ensureDuty();
+    var parts = text.split(/\s+/);
+    var cmd = parts[0].replace(/^\//, '').toLowerCase();
+    var arg = text.replace(/^\/\S+\s*/, '').trim();
+
+    if (cmd === '출석' || cmd === '출석체크') {
+      var owned = 0;
+      try {
+        var rawOwned = sg('PRANA_OWNED_STUDENTS');
+        var arr = rawOwned ? JSON.parse(rawOwned) : [];
+        if (Array.isArray(arr)) owned = arr.length;
+      } catch (e) {}
+      dutyReply([
+        '출석 보고드립니다. 모집 학생 수 약 ' + owned + '명으로 확인됩니다.',
+        data.notice ? '현재 공지: ' + data.notice : '등록된 공지는 없습니다.'
+      ]);
+      return true;
+    }
+
+    if (cmd === '공지') {
+      if (!arg) {
+        dutyReply([data.notice ? '현재 공지: ' + data.notice : '공지 내용이 비어 있습니다. /공지 [내용] 으로 등록해 주세요.']);
+        return true;
+      }
+      data.notice = arg;
+      saveDuty(data);
+      ss(NOTICE_KEY, arg);
+      dutyReply(['공지를 등록했습니다: 「' + arg + '」']);
+      return true;
+    }
+
+    if (cmd === '보고') {
+      dutyReply([
+        '현황 보고드립니다.',
+        '당번: ' + (data.members || []).map(nameOf).join(', '),
+        data.notice ? '공지: ' + data.notice : '공지 없음',
+        data.todayMemo ? '당번 메모 작성됨' : '당번 메모 미작성',
+        '지시 사항 있으시면 말씀해 주세요.'
+      ]);
+      return true;
+    }
+
+    if (cmd === '정리') {
+      var note = arg || '집무실 간단 정리 완료';
+      data.todayMemo = (data.todayMemo ? data.todayMemo + '\n' : '') + '· ' + note + ' (' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ')';
+      saveDuty(data);
+      dutyReply(['정리 반영했습니다. 「' + note + '」']);
+      return true;
+    }
+
+    if (cmd === '호출') {
+      if (!arg) {
+        dutyReply(['호출할 학생 이름을 적어 주세요. 예: /호출 시로코']);
+        return true;
+      }
+      var P = getPersonas();
+      var found = null;
+      Object.keys(P).forEach(function (id) {
+        var p = P[id];
+        if (!p || p.isGroup) return;
+        if (p.name === arg || id === arg || (p.name && p.name.indexOf(arg) >= 0)) {
+          if (!found) found = id;
+        }
+      });
+      if (!found) {
+        dutyReply(['「' + arg + '」 학생을 찾지 못했습니다.']);
+        return true;
+      }
+      try {
+        if (typeof isStudentOwned === 'function' && !isStudentOwned(found)) {
+          dutyReply([nameOf(found) + ' 학생은 아직 모집되지 않았습니다.']);
+          return true;
+        }
+      } catch (e) {}
+      if (typeof appendMessage === 'function') {
+        appendMessage(
+          nameOf(found),
+          '집무실 호출을 받았습니다. 잠시 들렀다 갈게요. 볼일 끝나면 돌아가겠습니다.',
+          true, nameOf(found), null, { hideActions: true }
+        );
+        try { if (typeof saveConversation === 'function') saveConversation(); } catch (e) {}
+      }
+      dutyReply(['「' + nameOf(found) + '」 학생을 호출했습니다.']);
+      return true;
+    }
+
+    if (cmd === '인수인계') {
+      openHandoverModal();
+      return true;
+    }
+
+    if (cmd === '당번확인' || cmd === '당번') {
+      dutyReply([
+        '오늘(' + data.date + ') 당번: ' + (data.members || []).map(nameOf).join(', '),
+        data.notice ? '공지: ' + data.notice : '공지 없음',
+        '인수인계는 상단 버튼 또는 /인수인계 로 확인할 수 있습니다.'
+      ]);
+      return true;
+    }
+
+    return false;
+  }
+
+  function enterOffice() {
+    ensureDuty();
+    try {
+      if (typeof switchMode === 'function') switchMode(MODE_ID);
+      else {
+        try { currentMode = MODE_ID; } catch (e) {}
+        ss('PRANA_MODE', MODE_ID);
+        if (typeof initChat === 'function') initChat();
+      }
+    } catch (e) {
+      alert('집무실 입장 실패: ' + (e.message || e));
+    }
+    setTimeout(function () {
+      updateBanner();
+      var data = loadDuty();
+      if (data && !data.greeted && isInOffice()) {
+        data.greeted = true;
+        saveDuty(data);
+      }
+    }, 400);
+  }
+
+  function patchOwned() {
+    if (typeof window.isStudentOwned !== 'function') return;
+    if (window.isStudentOwned.__v114) return;
+    var prev = window.isStudentOwned;
+    var wrapped = function (id) {
+      if (id === MODE_ID) return true;
+      return prev.apply(this, arguments);
+    };
+    wrapped.__v114 = true;
+    window.isStudentOwned = wrapped;
+  }
+
+  function installSendHook() {
+    if (typeof window.sendMessage !== 'function') return;
+    if (window.sendMessage.__v114schale) return;
+    var prev = window.sendMessage;
+    var wrapped = async function () {
+      try {
+        if (isInOffice()) {
+          var input = document.getElementById('user-input');
+          var text = input ? input.value.trim() : '';
+          if (text.startsWith('/')) {
+            var handled = handleCommand(text);
+            if (handled) {
+              if (input) input.value = '';
+              var sendBtn = document.getElementById('send-btn');
+              if (sendBtn) sendBtn.disabled = false;
+              return;
+            }
+          }
+        }
+      } catch (e) {}
+      return prev.apply(this, arguments);
+    };
+    wrapped.__v114schale = true;
+    if (prev.__v113img) wrapped.__v113img = true;
+    if (prev.__v111ws) wrapped.__v111ws = true;
+    if (prev.__pranaModeGuard) wrapped.__pranaModeGuard = true;
+    window.sendMessage = wrapped;
+    try { sendMessage = wrapped; } catch (e) {}
+  }
+
+  function installModeWatch() {
+    if (window.__v114modeWatch) return;
+    window.__v114modeWatch = true;
+    var last = null;
+    setInterval(function () {
+      try {
+        var mode = (typeof currentMode !== 'undefined') ? currentMode : sg('PRANA_MODE');
+        if (mode !== last) {
+          last = mode;
+          ensureDuty();
+          updateBanner();
+        } else if (mode === MODE_ID) {
+          updateBanner();
+        }
+      } catch (e) {}
+    }, 1500);
+  }
+
+  function injectMenu() {
+    var list = document.querySelector('#main-menu-modal .menu-list') ||
+      (typeof window.__pranaGetMenuList === 'function' ? window.__pranaGetMenuList() : null);
+    if (!list) return;
+    if (document.getElementById('menu-v114-schale')) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'menu-v114-schale';
+    btn.className = 'menu-item-btn';
+    btn.setAttribute('data-search', '샬레 집무실 당번 인수인계 schale office duty');
+    btn.textContent = '🏛️ 샬레 집무실';
+    btn.onclick = function () {
+      try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+      enterOffice();
+    };
+    list.insertBefore(btn, list.firstChild);
+  }
+
+  function boot() {
+    patchOwned();
+    ensureDuty();
+    placeBanner();
+    updateBanner();
+    installSendHook();
+    installModeWatch();
+    injectMenu();
+
+    var bHo = document.getElementById('v114-btn-handover');
+    if (bHo) bHo.onclick = openHandoverModal;
+    var bCmd = document.getElementById('v114-btn-cmds');
+    if (bCmd) bCmd.onclick = showCommandsHelp;
+    var hoClose = document.getElementById('v114-ho-close');
+    if (hoClose) hoClose.onclick = closeHandoverModal;
+    var hoSave = document.getElementById('v114-ho-save');
+    if (hoSave) hoSave.onclick = saveTodayMemo;
+    var modal = document.getElementById('v114-handover-modal');
+    if (modal && !modal.__wired) {
+      modal.__wired = true;
+      modal.addEventListener('click', function (ev) { if (ev.target === modal) closeHandoverModal(); });
+    }
+
+    setInterval(function () {
+      patchOwned();
+      ensureDuty();
+      placeBanner();
+      installSendHook();
+      injectMenu();
+    }, 7000);
+
+    console.log('[PRANA] v11.4 Schale Office · Duty · Handover ready');
+  }
+
+  window.openV114SchaleOffice = enterOffice;
+  window.openV114Handover = openHandoverModal;
+  window.__v114EnsureDuty = ensureDuty;
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+
 </html>
