@@ -6807,15 +6807,28 @@ ${bondNote}
   }
 
   function getQuizReward() {
-    if (quizMode === 'arona') return 18;
-    if (quizMode === 'hard' || quizMode === 'expert') return 0; // 청휘석으로 지급
-    return 10;
+    var base = 10;
+    if (quizMode === 'arona') base = 18;
+    if (quizMode === 'hard' || quizMode === 'expert') base = 0; // 청휘석으로 지급
+    // 용대석 업그레이드: 미니게임 보상 올리기 (+20%/Lv) — 퀴즈 크레딧에도 적용
+    try {
+      var _u = JSON.parse(localStorage.getItem('PRANA_V115_YD_UPGRADES') || '{}');
+      var _lv = Math.max(0, Math.min(5, Math.floor(Number(_u.minigameBoost) || 0)));
+      if (base > 0 && _lv > 0) base = Math.max(1, Math.floor(base * (1 + _lv * 0.2)));
+    } catch (e) {}
+    return base;
   }
 
   function getPyroxeneReward() {
-    if (quizMode === 'expert') return 60;
-    if (quizMode === 'hard') return 10;
-    return 0;
+    var base = 0;
+    if (quizMode === 'expert') base = 60;
+    else if (quizMode === 'hard') base = 10;
+    try {
+      var _u = JSON.parse(localStorage.getItem('PRANA_V115_YD_UPGRADES') || '{}');
+      var _lv = Math.max(0, Math.min(5, Math.floor(Number(_u.minigameBoost) || 0)));
+      if (base > 0 && _lv > 0) base = Math.max(1, Math.floor(base * (1 + _lv * 0.2)));
+    } catch (e) {}
+    return base;
   }
 
   function updateQuizModeUI() {
@@ -11068,10 +11081,23 @@ try {
   function gradeFromAccuracy(acc) {
     // acc: 0~1
     const pct = acc * 100;
-    if (pct >= 90) return { key: 'perfect', label: 'Perfect', color: '#fbbf24', reward: { credits: 8, pyro: 1 } };
-    if (pct >= 80) return { key: 'excellent', label: 'Excellent', color: '#a78bfa', reward: { credits: 5 } };
-    if (pct >= 50) return { key: 'good', label: 'Good', color: '#67e8f9', reward: { credits: 3 } };
-    if (pct >= 20) return { key: 'ok', label: 'OK', color: '#86efac', reward: { credits: 1 } };
+    // 용대석 업그레이드: 미니게임 보상 올리기 (레벨당 +20%)
+    var boost = 1;
+    try {
+      var _u = JSON.parse(localStorage.getItem('PRANA_V115_YD_UPGRADES') || '{}');
+      var _lv = Math.max(0, Math.min(5, Math.floor(Number(_u.minigameBoost) || 0)));
+      boost = 1 + _lv * 0.2;
+    } catch (e) {}
+    function R(credits, pyro) {
+      var out = {};
+      if (credits) out.credits = Math.max(0, Math.floor(credits * boost));
+      if (pyro) out.pyro = Math.max(0, Math.floor(pyro * boost));
+      return out;
+    }
+    if (pct >= 90) return { key: 'perfect', label: 'Perfect', color: '#fbbf24', reward: R(8, 1) };
+    if (pct >= 80) return { key: 'excellent', label: 'Excellent', color: '#a78bfa', reward: R(5, 0) };
+    if (pct >= 50) return { key: 'good', label: 'Good', color: '#67e8f9', reward: R(3, 0) };
+    if (pct >= 20) return { key: 'ok', label: 'OK', color: '#86efac', reward: R(1, 0) };
     // 15% 이상 및 이하 → bad (요청: 15%이상및 이하는 bad → 20% 미만 전부 bad)
     return { key: 'bad', label: 'Bad', color: '#fb7185', reward: {} };
   }
@@ -17532,6 +17558,28 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
       var scores = readScores(); scores.push({ name: name, rounds: rounds, time: Number(used.toFixed(1)), at: Date.now() });
       scores.sort(function (a, b) { return (b.rounds - a.rounds) || (a.time - b.time) || (a.at - b.at); });
       writeScores(scores);
+      // 용대석 보상: 라운드×2 + 해킹 보상 업그레이드(+20%/Lv)
+      try {
+        var base = rounds * 2;
+        var bonus = 0;
+        try {
+          var _hu = JSON.parse(localStorage.getItem('PRANA_V115_YD_UPGRADES') || '{}');
+          var _hlv = Math.max(0, Math.min(5, Math.floor(Number(_hu.hackReward) || 0)));
+          bonus = Math.floor(base * (_hlv * 0.2));
+        } catch (e2) {}
+        var total = base + bonus;
+        if (typeof window.addYongdae === 'function') window.addYongdae(total);
+        else {
+          var yk = 'PRANA_V115_YONGDAESEOK';
+          var cur = Math.max(0, Math.floor(Number(localStorage.getItem(yk) || 0) || 0));
+          localStorage.setItem(yk, String(cur + total));
+        }
+        var extra = document.createElement('div');
+        extra.style.cssText = 'margin-top:8px;padding:8px;background:rgba(251,191,36,.12);border-radius:8px;font-size:13px;';
+        extra.innerHTML = '용대석 +' + total + ' 획득!' + (bonus ? ' (업그레이드 +' + bonus + ')' : '');
+        result.appendChild(extra);
+        result.setAttribute('data-v115-rewarded', '1');
+      } catch (e) {}
     }
     setText('v105-hack-round', '기록 완료');
   }
@@ -23839,35 +23887,27 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
   }
 
   function installHackHook() {
+    // 해킹 용대석 지급은 v105 finish()에서 직접 처리.
+    // 여기선 아이콘만 보강 (이중 지급 방지)
     if (window.__v115HackHook) return;
     window.__v115HackHook = true;
-    var lastResult = '';
     setInterval(function () {
       try {
         var result = document.getElementById('v105-hack-result');
         if (!result || result.style.display === 'none') return;
-        var html = result.innerHTML || '';
-        if (html === lastResult) return;
-        lastResult = html;
-        if (html.indexOf('완료 라운드') < 0) return;
-        if (result.getAttribute('data-v115-rewarded') === '1') return;
-        var m = html.match(/완료 라운드:\s*<b>(\d+)회<\/b>/);
-        if (!m) return;
-        var rounds = parseInt(m[1], 10) || 0;
-        if (rounds <= 0) return;
-        result.setAttribute('data-v115-rewarded', '1');
-        var upg = loadUpgrades();
-        var base = rounds * 2;
-        var bonus = Math.floor(base * (upg.hackReward * 0.2));
-        var total = base + bonus;
-        addYongdae(total);
-        var extra = document.createElement('div');
-        extra.style.cssText = 'margin-top:8px;padding:8px;background:rgba(251,191,36,.12);border-radius:8px;font-size:13px;';
-        extra.innerHTML = iconImg('yongdae', 18) + ' <strong>용대석 +' + total + '</strong> 획득!' +
-          (upg.hackReward ? ' <span style="color:#8a9bb0;font-size:11px;">(업그레이드 +' + bonus + ')</span>' : '');
-        result.appendChild(extra);
+        if (result.getAttribute('data-v115-icon') === '1') return;
+        var t = result.textContent || '';
+        if (t.indexOf('용대석') < 0) return;
+        result.setAttribute('data-v115-icon', '1');
+        // 이미 finish가 텍스트로 넣었으면 아이콘만 앞에 붙임
+        var nodes = result.querySelectorAll('div');
+        for (var i = 0; i < nodes.length; i++) {
+          if ((nodes[i].textContent || '').indexOf('용대석') >= 0 && !nodes[i].querySelector('.v115-cur-icon')) {
+            nodes[i].innerHTML = iconImg('yongdae', 18) + ' ' + nodes[i].innerHTML;
+          }
+        }
       } catch (e) {}
-    }, 400);
+    }, 500);
   }
 
   function patchBondTicket() {
@@ -23876,22 +23916,36 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
     var prev = window.useBondTicket;
     window.useBondTicket = function () {
       var upg = loadUpgrades();
-      var extra = upg.ticketPower;
+      var extra = upg.ticketPower | 0;
       var beforeTickets = null;
       try { beforeTickets = Number(sg('PRANA_BOND_TICKETS') || 50) || 0; } catch (e) {}
       var ret = prev.apply(this, arguments);
       try {
         var afterTickets = Number(sg('PRANA_BOND_TICKETS') || 50) || 0;
         if (extra > 0 && beforeTickets !== null && afterTickets < beforeTickets) {
-          var mode = (typeof currentMode !== 'undefined') ? currentMode : sg('PRANA_MODE');
-          var bondKey = 'PRANA_BOND_RANK_' + mode;
-          var cur = Math.max(1, Math.floor(Number(sg(bondKey) || 1) || 1));
           var bonus = 1 + Math.floor(Math.random() * extra);
-          ss(bondKey, String(cur + bonus));
+          // 공식 인연 API 사용 (PRANA_BOND_RANKS)
+          if (typeof forceChangeBond === 'function') {
+            forceChangeBond(bonus);
+          } else if (typeof changeBondRank === 'function') {
+            changeBondRank(bonus);
+          } else {
+            try {
+              var ranks = JSON.parse(sg('PRANA_BOND_RANKS') || '{}');
+              var mode = (typeof currentMode !== 'undefined') ? currentMode : sg('PRANA_MODE');
+              if (mode) {
+                var cur = Math.max(1, Math.min(100, Math.floor(Number(ranks[mode]) || 1)));
+                ranks[mode] = Math.min(100, cur + bonus);
+                ss('PRANA_BOND_RANKS', JSON.stringify(ranks));
+              }
+            } catch (e3) {}
+          }
           try {
             if (typeof appendMessage === 'function') {
               appendMessage('시스템', '용대석 업그레이드 효과: 인연 추가 +' + bonus, true, '인연 시스템', null, { hideActions: true });
             }
+            if (typeof refreshEconomyUI === 'function') refreshEconomyUI();
+            if (typeof updateBondRankUI === 'function') updateBondRankUI();
           } catch (e2) {}
         }
       } catch (e) {}
@@ -23903,7 +23957,7 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
   var SHOP_UPGRADES = [
     { id: 'ticketPower', name: '인연 티켓 강도 증가', desc: '인연 티켓 사용 시 추가 랭크 상승 (레벨당 +1~N)', max: 5, costs: [15, 30, 50, 80, 120] },
     { id: 'hackReward', name: '해킹 미니게임 보상 증가', desc: '해킹 완료 시 용대석 보상 +20%/레벨', max: 5, costs: [20, 40, 70, 110, 160] },
-    { id: 'minigameBoost', name: '미니게임 보상 올리기', desc: '조준 등 기타 미니게임 보상 소폭 증가', max: 5, costs: [25, 45, 75, 120, 180] }
+    { id: 'minigameBoost', name: '미니게임 보상 올리기', desc: '조준·퀴즈 크레딧/청휘석 보상 +20%/레벨', max: 5, costs: [25, 45, 75, 120, 180] }
   ];
   var SHOP_ITEMS = [
     { id: 'bondDown', name: '인연 낮추기 티켓', desc: '현재 학생 인연 랭크 -1 (최소 1)', cost: 25, icon: 'ticket' },
@@ -24027,13 +24081,46 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
       alert('인연을 내릴 학생을 대화 상대로 선택한 뒤 사용해 주세요.');
       return;
     }
-    var bondKey = 'PRANA_BOND_RANK_' + mode;
-    var cur = Math.max(1, Math.floor(Number(sg(bondKey) || 1) || 1));
+    var persona = null;
+    try {
+      if (typeof PERSONAS !== 'undefined' && PERSONAS[mode]) persona = PERSONAS[mode];
+      else if (typeof getPersonas === 'function') persona = (getPersonas() || {})[mode];
+    } catch (e) {}
+    if (persona && (persona.isGroup || persona.noBond)) {
+      alert('이 상대는 인연 시스템을 사용하지 않습니다.');
+      return;
+    }
+    var cur = 1;
+    try {
+      if (typeof getBondRank === 'function') cur = getBondRank(mode);
+      else {
+        var ranks = JSON.parse(sg('PRANA_BOND_RANKS') || '{}');
+        cur = Math.max(1, Math.floor(Number(ranks[mode]) || 1));
+      }
+    } catch (e) { cur = 1; }
     if (cur <= 1) { alert('이미 인연 랭크 1입니다.'); return; }
-    ss(bondKey, String(cur - 1));
+    var next = cur - 1;
+    try {
+      if (typeof forceChangeBond === 'function') {
+        forceChangeBond(-1);
+      } else if (typeof changeBondRank === 'function') {
+        changeBondRank(-1);
+      } else {
+        var ranks2 = JSON.parse(sg('PRANA_BOND_RANKS') || '{}');
+        ranks2[mode] = next;
+        ss('PRANA_BOND_RANKS', JSON.stringify(ranks2));
+      }
+    } catch (e) {
+      alert('인연 변경 실패: ' + (e.message || e));
+      return;
+    }
     items.bondDown -= 1;
     saveItems(items);
-    alert('인연 랭크가 ' + cur + ' → ' + (cur - 1) + '로 내려갔습니다.');
+    alert('인연 랭크가 ' + cur + ' → ' + next + '로 내려갔습니다.');
+    try {
+      if (typeof updateBondRankUI === 'function') updateBondRankUI();
+      if (typeof refreshEconomyUI === 'function') refreshEconomyUI();
+    } catch (e) {}
     renderShop();
   };
 
