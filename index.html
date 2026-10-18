@@ -17579,6 +17579,7 @@ body.v97-season-on .v75-ambiance-layer { opacity:1 !important; }
         extra.innerHTML = '용대석 +' + total + ' 획득!' + (bonus ? ' (업그레이드 +' + bonus + ')' : '');
         result.appendChild(extra);
         result.setAttribute('data-v115-rewarded', '1');
+        try { if (typeof window.__v115DecorateHackResult === 'function') window.__v115DecorateHackResult(); } catch (e3) {}
       } catch (e) {}
     }
     setText('v105-hack-round', '기록 완료');
@@ -23821,7 +23822,7 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
     var s = document.createElement('style');
     s.id = 'v115-cur-style';
     s.textContent = [
-      '.v115-cur-icon{width:18px;height:18px;vertical-align:middle;display:inline-block;object-fit:contain;margin:0 3px 0 1px;flex-shrink:0;}',
+      '.v115-cur-icon{width:18px;height:18px;vertical-align:middle;display:inline-block;object-fit:contain;margin:0 3px 0 1px;flex-shrink:0;pointer-events:none;content-visibility:auto;}',
       '.v115-cur-label{display:inline-flex;align-items:center;gap:2px;flex-wrap:wrap;}',
       '#v115-yd-modal{display:none;position:fixed;inset:0;z-index:10050;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:16px;}',
       '#v115-yd-modal .modal-content{background:var(--card-bg,#151a24);border:1px solid var(--border-color,#2a3447);border-radius:14px;padding:16px;width:100%;max-width:420px;max-height:85vh;overflow-y:auto;color:var(--text-color,#e0e6ed);}',
@@ -23887,11 +23888,11 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
   }
 
   function installHackHook() {
-    // 해킹 용대석 지급은 v105 finish()에서 직접 처리.
-    // 여기선 아이콘만 보강 (이중 지급 방지)
+    // 해킹 용대석 지급은 v105 finish()에서 직접 처리. 아이콘 보강은 결과 표시 시에만.
     if (window.__v115HackHook) return;
     window.__v115HackHook = true;
-    setInterval(function () {
+    // 상시 폴링 제거 (끊김 방지). finish 직후 한 번만 시도하도록 클릭/표시 후 지연 호출.
+    window.__v115DecorateHackResult = function () {
       try {
         var result = document.getElementById('v105-hack-result');
         if (!result || result.style.display === 'none') return;
@@ -23899,7 +23900,6 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
         var t = result.textContent || '';
         if (t.indexOf('용대석') < 0) return;
         result.setAttribute('data-v115-icon', '1');
-        // 이미 finish가 텍스트로 넣었으면 아이콘만 앞에 붙임
         var nodes = result.querySelectorAll('div');
         for (var i = 0; i < nodes.length; i++) {
           if ((nodes[i].textContent || '').indexOf('용대석') >= 0 && !nodes[i].querySelector('.v115-cur-icon')) {
@@ -23907,7 +23907,7 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
           }
         }
       } catch (e) {}
-    }, 500);
+    };
   }
 
   function patchBondTicket() {
@@ -24189,8 +24189,10 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
   }
 
   /* 정적 HTML 이모지 → 아이콘 이미지 치환 */
+  /* 성능: 아이콘 치환은 "보이는 모달"만, 한 번 처리한 노드는 스킵, rAF idle 사용 */
   function replaceEmojisIn(el) {
     if (!el || el.nodeType !== 1) return;
+    if (el.getAttribute && el.getAttribute('data-v115-scanned') === '1') return;
     if (el.id === 'v75-ambiance-layer' || (el.classList && el.classList.contains('v75-particle'))) return;
     if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') return;
     var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
@@ -24209,67 +24211,82 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
     });
     var nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
-    nodes.forEach(function (tn) {
-      if (!tn.parentNode) return;
+    for (var i = 0; i < nodes.length; i++) {
+      var tn = nodes[i];
+      if (!tn.parentNode) continue;
       var p = tn.parentNode;
       var t = tn.nodeValue;
-      if (!t) return;
+      if (!t) continue;
       var html = t
         .replace(/💎/g, iconImg('pyroxene', 16))
         .replace(/🪙/g, iconImg('credits', 16))
         .replace(/🎫/g, iconImg('ticket', 16))
         .replace(/✨(?=\s*엘리그마)/g, iconImg('eligma', 16));
-      if (html === t) return;
+      if (html === t) continue;
       var span = document.createElement('span');
       span.className = 'v115-cur-label';
       span.innerHTML = html;
       p.replaceChild(span, tn);
-    });
+    }
+    try { el.setAttribute('data-v115-scanned', '1'); } catch (e) {}
   }
 
-  function scanIcons() {
+  function isVisibleModal(el) {
+    if (!el) return false;
+    var d = el.style && el.style.display;
+    if (d === 'none') return false;
+    var cs = window.getComputedStyle ? getComputedStyle(el) : null;
+    if (cs && (cs.display === 'none' || cs.visibility === 'hidden')) return false;
+    return true;
+  }
+
+  function scanIcons(force) {
+    if (window.__v115ScanBusy) return;
+    // 분위기 연출 켜져 있으면 스캔 자체를 건너뛰어 프레임 확보
     try {
-      // 모달·메뉴만 스캔 (전체 body / 분위기 레이어는 제외 → 애니메이션 끊김 방지)
-      var roots = [
-        document.getElementById('main-menu-modal'),
-        document.getElementById('gacha-modal'),
-        document.getElementById('shop-modal'),
-        document.getElementById('bond-build-modal'),
-        document.getElementById('quiz-modal'),
-        document.getElementById('daily-modal'),
-        document.getElementById('eligma-shop-modal'),
-        document.getElementById('setting-shop-modal'),
-        document.getElementById('ambiance-modal'),
-        document.getElementById('v115-yd-modal')
-      ];
-      roots.forEach(function (r) { if (r) replaceEmojisIn(r); });
+      if (!force && document.body && document.body.classList.contains('v75-ambiance-on')) return;
     } catch (e) {}
+    window.__v115ScanBusy = true;
+    var run = function () {
+      try {
+        var ids = [
+          'main-menu-modal', 'gacha-modal', 'shop-modal', 'bond-build-modal',
+          'quiz-modal', 'daily-modal', 'eligma-shop-modal', 'setting-shop-modal',
+          'ambiance-modal', 'v115-yd-modal'
+        ];
+        for (var i = 0; i < ids.length; i++) {
+          var r = document.getElementById(ids[i]);
+          if (!r || !isVisibleModal(r)) continue;
+          // 내용이 바뀌었을 수 있으면 scanned 플래그 제거 후 재스캔은 호출측에서 force
+          if (force) try { r.removeAttribute('data-v115-scanned'); } catch (e2) {}
+          replaceEmojisIn(r);
+        }
+      } catch (e) {}
+      window.__v115ScanBusy = false;
+    };
+    // 브라우저 한가할 때 실행
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(run, { timeout: 400 });
+    } else {
+      setTimeout(run, 0);
+    }
   }
 
-  /* MutationObserver: 분위기 레이어 제외, 모달 위주 */
+  /* MutationObserver 제거 — 끊김 주원인. 모달 열릴 때만 스캔 */
   function watchDOM() {
-    if (window.__v115Observer) return;
-    try {
-      var obs = new MutationObserver(function (muts) {
-        var need = false;
-        for (var i = 0; i < muts.length; i++) {
-          var m = muts[i];
-          if (m.type !== 'childList' || !m.addedNodes.length) continue;
-          var t = m.target;
-          if (t && t.id === 'v75-ambiance-layer') continue;
-          if (t && t.classList && t.classList.contains('v75-particle')) continue;
-          if (t && t.closest && t.closest('#v75-ambiance-layer')) continue;
-          need = true;
-          break;
-        }
-        if (need) {
-          clearTimeout(window.__v115ScanTimer);
-          window.__v115ScanTimer = setTimeout(scanIcons, 200);
-        }
-      });
-      obs.observe(document.body, { childList: true, subtree: true, characterData: false });
-      window.__v115Observer = obs;
-    } catch (e) {}
+    // no-op (성능)
+  }
+
+  function hookModalOpens() {
+    if (window.__v115ModalHook) return;
+    window.__v115ModalHook = true;
+    // 클릭 후 모달이 열린 뒤에만 가볍게 스캔
+    document.addEventListener('click', function () {
+      clearTimeout(window.__v115ClickScan);
+      window.__v115ClickScan = setTimeout(function () {
+        scanIcons(true);
+      }, 120);
+    }, true);
   }
 
   function boot() {
@@ -24277,14 +24294,15 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
     injectMenu();
     installHackHook();
     patchBondTicket();
-    scanIcons();
-    watchDOM();
+    hookModalOpens();
+    // 최초 1회만 (메뉴 정적 라벨)
+    setTimeout(function () { scanIcons(true); }, 300);
+    // 메뉴 버튼만 가끔 재주입 (스캔 없음)
     setInterval(function () {
       injectMenu();
       patchBondTicket();
-      scanIcons();
-    }, 8000);
-    console.log('[PRANA] v11.5c Currency icons + 용대석 (ambiance-safe)');
+    }, 15000);
+    console.log('[PRANA] v11.5d Currency icons + 용대석 (low-jank)');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
