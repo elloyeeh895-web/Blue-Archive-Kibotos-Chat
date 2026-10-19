@@ -816,9 +816,11 @@
     }
     .v75-ambiance-layer {
       pointer-events: none; position: fixed; inset: 0; z-index: 0; overflow: hidden;
-      opacity: 0; transition: opacity 0.6s;
+      opacity: 0; transition: opacity 0.5s;
+      contain: strict;
+      transform: translateZ(0);
     }
-    body.v75-ambiance-on .v75-ambiance-layer { opacity: 1 !important; }
+    body.v75-ambiance-on .v75-ambiance-layer { opacity: 1 !important; visibility: visible !important; }
     body.v75-ambiance-off .v75-ambiance-layer { opacity: 0 !important; visibility: hidden !important; }
     body.v75-ambiance-paused .v75-particle { animation-play-state: paused !important; }
     body.v75-ambiance-on header,
@@ -826,18 +828,23 @@
     body.v75-ambiance-on footer,
     body.v75-ambiance-on .mention-bar,
     body.v75-ambiance-on .v75-demo-banner { position: relative; z-index: 1; }
+    /* 모바일 끊김 완화: opacity 키프레임 없음 → transform만 (합성 레이어) */
     .v75-particle {
       position: absolute; border-radius: 50%;
-      background: var(--accent-color); opacity: 0.18;
+      background: var(--accent-color);
+      opacity: 0.16;
       animation: v75-float linear infinite;
-      will-change: transform, opacity;
+      will-change: transform;
+      transform: translate3d(0, 110vh, 0);
       backface-visibility: hidden;
+      pointer-events: none;
     }
     @keyframes v75-float {
-      0% { transform: translate3d(0, 110vh, 0) scale(0.6); opacity: 0; }
-      15% { opacity: 0.22; }
-      85% { opacity: 0.12; }
-      100% { transform: translate3d(0, -10vh, 0) scale(1.1); opacity: 0; }
+      0% { transform: translate3d(0, 110vh, 0) scale(0.7); }
+      100% { transform: translate3d(0, -12vh, 0) scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .v75-particle { animation: none !important; opacity: 0 !important; }
     }
     .v75-time-tint {
       position: absolute; inset: 0;
@@ -1153,7 +1160,8 @@
     .v75-particle.shape-square { border-radius: 2px !important; }
     .v75-particle.shape-diamond {
       border-radius: 2px !important;
-      transform: rotate(45deg);
+      /* rotate는 animation transform과 충돌 → clip-path 사용 */
+      clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
     }
     .v75-particle.shape-star {
       border-radius: 0 !important;
@@ -6221,9 +6229,20 @@ ${bondNote}
   if (['low','mid','high'].indexOf(ambianceDensity) < 0) ambianceDensity = 'mid';
 
   function particleCountForDensity() {
-    if (ambianceDensity === 'low') return 8;
-    if (ambianceDensity === 'high') return 28;
-    return 14;
+    // 모바일·저사양: 입자 수 자동 하향 (밀도 설정은 유지)
+    var mobile = false;
+    try {
+      mobile = window.matchMedia && (
+        window.matchMedia('(max-width: 768px)').matches ||
+        window.matchMedia('(pointer: coarse)').matches
+      );
+    } catch (e) {}
+    var low = mobile ? 4 : 8;
+    var mid = mobile ? 7 : 12;
+    var high = mobile ? 10 : 18;
+    if (ambianceDensity === 'low') return low;
+    if (ambianceDensity === 'high') return high;
+    return mid;
   }
   function sizeRangeFor() {
     if (ambianceSize === 'small') return [2, 4];
@@ -6254,8 +6273,15 @@ ${bondNote}
         p.style.height = size + 'px';
       }
       p.style.left = Math.random() * 100 + '%';
-      p.style.animationDuration = (10 + Math.random() * 18) + 's';
-      p.style.animationDelay = (Math.random() * 12) + 's';
+      var mobile = false;
+      try {
+        mobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+      } catch (e2) {}
+      // 모바일은 조금 더 느리게 → 프레임 부담↓, 끊김 체감↓
+      var base = mobile ? 16 : 12;
+      var span = mobile ? 20 : 16;
+      p.style.animationDuration = (base + Math.random() * span) + 's';
+      p.style.animationDelay = (Math.random() * (mobile ? 10 : 12)) + 's';
       layer.appendChild(p);
     }
     return layer;
