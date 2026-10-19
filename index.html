@@ -850,6 +850,12 @@
       position: absolute; inset: 0;
       background: radial-gradient(ellipse at 50% 0%, transparent 40%, var(--v75-tint, transparent) 100%);
       opacity: 0.35; transition: background 1s;
+      pointer-events: none;
+    }
+    /* 모바일: 입자 대신 은은한 고정 광만 (애니메이션 없음) */
+    @media (max-width: 900px) {
+      body.v75-ambiance-on .v75-time-tint { opacity: 0.42; }
+      body.v75-ambiance-on .v75-particle { display: none !important; animation: none !important; }
     }
     body.v75-ambiance-on #chat-container .message.bot {
       box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-color) 18%, transparent);
@@ -6228,21 +6234,20 @@ ${bondNote}
   if (['circle','square','diamond','star'].indexOf(ambianceShape) < 0) ambianceShape = 'circle';
   if (['low','mid','high'].indexOf(ambianceDensity) < 0) ambianceDensity = 'mid';
 
-  function particleCountForDensity() {
-    // 모바일·저사양: 입자 수 자동 하향 (밀도 설정은 유지)
-    var mobile = false;
+  function isAmbianceMobile() {
     try {
-      mobile = window.matchMedia && (
-        window.matchMedia('(max-width: 768px)').matches ||
+      return !!(window.matchMedia && (
+        window.matchMedia('(max-width: 900px)').matches ||
         window.matchMedia('(pointer: coarse)').matches
-      );
-    } catch (e) {}
-    var low = mobile ? 4 : 8;
-    var mid = mobile ? 7 : 12;
-    var high = mobile ? 10 : 18;
-    if (ambianceDensity === 'low') return low;
-    if (ambianceDensity === 'high') return high;
-    return mid;
+      ));
+    } catch (e) { return false; }
+  }
+  function particleCountForDensity() {
+    // 모바일/터치기기는 입자 0개 (끊김 방지). 시간대 틴트만 사용.
+    if (isAmbianceMobile()) return 0;
+    if (ambianceDensity === 'low') return 6;
+    if (ambianceDensity === 'high') return 16;
+    return 10;
   }
   function sizeRangeFor() {
     if (ambianceSize === 'small') return [2, 4];
@@ -20585,12 +20590,19 @@ body.v97-season-on.v75-ambiance-on .v75-ambiance-layer { opacity:1 !important; }
       }
       var fx = w && w.desc ? weatherDescToFx(w.desc) : null;
       clearWxClasses();
+      var wxMobile = false;
+      try {
+        wxMobile = window.matchMedia && (
+          window.matchMedia('(max-width: 900px)').matches ||
+          window.matchMedia('(pointer: coarse)').matches
+        );
+      } catch (eM) {}
       if (fx === 'rain') {
         document.body.classList.add('v110-wx-on', 'v110-wx-rain');
-        spawnRain(28);
+        if (!wxMobile) spawnRain(28);
       } else if (fx === 'snow') {
         document.body.classList.add('v110-wx-on', 'v110-wx-snow');
-        spawnSnow(22);
+        if (!wxMobile) spawnSnow(22);
       } else if (fx === 'fog') {
         document.body.classList.add('v110-wx-on', 'v110-wx-fog');
         ensureWxLayer();
