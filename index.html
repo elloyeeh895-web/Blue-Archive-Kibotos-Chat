@@ -24313,4 +24313,573 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
 </script>
 
 
+
+<!-- ========== v11.6 용대석 활용 확장 (통째로 붙여넣기용) ========== -->
+<!-- index.html 의 </body> 직전 또는 v11.5 용대석 스크립트 바로 뒤에 이 블록 전체를 붙여넣으세요 -->
+<script id="v116-yongdae-expand">
+/**
+ * v11.6 용대석 활용 확장 패치
+ * - 기존 v11.5 (window.__v115Currency) 위에 얹어서 사용
+ * - 인연 보호·가챠·일일보너스·스탬프·배경·집무실 연동 아이템 포함
+ */
+(function () {
+  'use strict';
+  if (window.__v116YongdaeExpand) return;
+  window.__v116YongdaeExpand = true;
+
+  /* ========== 유틸 (v115와 동일 키 사용) ========== */
+  var YD_KEY = 'PRANA_V115_YONGDAESEOK';
+  var YD_UPG_KEY = 'PRANA_V115_YD_UPGRADES';
+  var YD_ITEM_KEY = 'PRANA_V115_YD_ITEMS';
+  var BOND_LOCK_KEY = 'PRANA_V116_BOND_LOCK_UNTIL';
+  var FORCE_BOND_DAY_KEY = 'PRANA_V116_FORCE_BOND_DAY';
+
+  function sg(k) {
+    try { return localStorage.getItem(k) || ''; } catch (e) {
+      return (typeof safeGet === 'function') ? (safeGet(k) || '') : '';
+    }
+  }
+  function ss(k, v) {
+    try { localStorage.setItem(k, String(v)); } catch (e) {
+      if (typeof safeSet === 'function') safeSet(k, String(v));
+    }
+  }
+  function iconImg(kind, size) {
+    if (typeof window.v115Icon === 'function') return window.v115Icon(kind, size);
+    return '';
+  }
+  function getYongdae() {
+    if (typeof window.getYongdae === 'function') return window.getYongdae();
+    return Math.max(0, Math.floor(Number(sg(YD_KEY) || 0) || 0));
+  }
+  function addYongdae(n) {
+    if (typeof window.addYongdae === 'function') return window.addYongdae(n);
+    var next = getYongdae() + Math.floor(n || 0);
+    ss(YD_KEY, String(Math.max(0, next)));
+    return next;
+  }
+
+  function loadUpgrades() {
+    try {
+      var o = JSON.parse(sg(YD_UPG_KEY) || '{}');
+      return {
+        ticketPower: Math.max(0, Math.min(5, Math.floor(Number(o.ticketPower) || 0))),
+        minigameBoost: Math.max(0, Math.min(5, Math.floor(Number(o.minigameBoost) || 0))),
+        hackReward: Math.max(0, Math.min(5, Math.floor(Number(o.hackReward) || 0))),
+        // v11.6
+        bondProtect: Math.max(0, Math.min(5, Math.floor(Number(o.bondProtect) || 0))),
+        gachaPity: Math.max(0, Math.min(3, Math.floor(Number(o.gachaPity) || 0))),
+        dailyBonus: Math.max(0, Math.min(5, Math.floor(Number(o.dailyBonus) || 0))),
+        stampSlot: Math.max(0, Math.min(3, Math.floor(Number(o.stampSlot) || 0))),
+        bgmUnlock: Math.max(0, Math.min(4, Math.floor(Number(o.bgmUnlock) || 0)))
+      };
+    } catch (e) {
+      return {
+        ticketPower: 0, minigameBoost: 0, hackReward: 0,
+        bondProtect: 0, gachaPity: 0, dailyBonus: 0, stampSlot: 0, bgmUnlock: 0
+      };
+    }
+  }
+  function saveUpgrades(u) { ss(YD_UPG_KEY, JSON.stringify(u)); }
+
+  function loadItems() {
+    try {
+      var o = JSON.parse(sg(YD_ITEM_KEY) || '{}');
+      return {
+        bondDown: Math.max(0, Math.floor(Number(o.bondDown) || 0)),
+        pickup: Math.max(0, Math.floor(Number(o.pickup) || 0)),
+        // v11.6
+        bondLock: Math.max(0, Math.floor(Number(o.bondLock) || 0)),
+        doubleTicket: Math.max(0, Math.floor(Number(o.doubleTicket) || 0)),
+        resetPity: Math.max(0, Math.floor(Number(o.resetPity) || 0)),
+        secretHint: Math.max(0, Math.floor(Number(o.secretHint) || 0)),
+        roomTheme: Math.max(0, Math.floor(Number(o.roomTheme) || 0)),
+        dutySkip: Math.max(0, Math.floor(Number(o.dutySkip) || 0))
+      };
+    } catch (e) {
+      return {
+        bondDown: 0, pickup: 0,
+        bondLock: 0, doubleTicket: 0, resetPity: 0, secretHint: 0, roomTheme: 0, dutySkip: 0
+      };
+    }
+  }
+  function saveItems(it) { ss(YD_ITEM_KEY, JSON.stringify(it)); }
+
+  /* ========== 신규 업그레이드 / 아이템 정의 ========== */
+  var NEW_UPGRADES = [
+    {
+      id: 'bondProtect',
+      name: '인연 보호막',
+      desc: '인연이 하락할 때 일정 확률로 방어 (레벨당 15%)',
+      max: 5,
+      costs: [20, 40, 70, 110, 160]
+    },
+    {
+      id: 'gachaPity',
+      name: '가챠 천장 단축',
+      desc: '천장 횟수를 레벨당 2회 감소',
+      max: 3,
+      costs: [50, 100, 180]
+    },
+    {
+      id: 'dailyBonus',
+      name: '일일 보너스 증폭',
+      desc: '출석·일일 미션 보상 +15%/레벨',
+      max: 5,
+      costs: [15, 30, 55, 90, 140]
+    },
+    {
+      id: 'stampSlot',
+      name: '스탬프 슬롯 확장',
+      desc: '한 번에 보낼 수 있는 스탬프 +1',
+      max: 3,
+      costs: [25, 50, 90]
+    },
+    {
+      id: 'bgmUnlock',
+      name: 'BGM 보관함 확장',
+      desc: '해금 가능한 BGM 슬롯 +2',
+      max: 4,
+      costs: [30, 60, 100, 150]
+    }
+  ];
+
+  var NEW_ITEMS = [
+    {
+      id: 'bondLock',
+      name: '인연 고정권',
+      desc: '24시간 동안 인연 하락을 완전히 차단',
+      cost: 35,
+      icon: 'ticket'
+    },
+    {
+      id: 'doubleTicket',
+      name: '더블 티켓',
+      desc: '인연 티켓 1회 사용 시 효과 2배',
+      cost: 20,
+      icon: 'ticket'
+    },
+    {
+      id: 'resetPity',
+      name: '천장 초기화권',
+      desc: '현재 가챠 천장 카운트를 0으로 초기화',
+      cost: 80,
+      icon: 'yongdae'
+    },
+    {
+      id: 'secretHint',
+      name: '비밀 학생 단서',
+      desc: '아직 모집하지 않은 학생 1명의 힌트를 공개',
+      cost: 45,
+      icon: 'eligma'
+    },
+    {
+      id: 'roomTheme',
+      name: '특별 배경 해금',
+      desc: '한정 배경 1종을 즉시 해금',
+      cost: 60,
+      icon: 'yongdae'
+    },
+    {
+      id: 'dutySkip',
+      name: '당번 스킵권',
+      desc: '오늘 당번 업무를 자동 완료 처리',
+      cost: 15,
+      icon: 'ticket'
+    }
+  ];
+
+  /* ========== 인연 보호 / 고정 로직 ========== */
+  function isBondLocked() {
+    var until = Number(sg(BOND_LOCK_KEY) || 0);
+    return until > Date.now();
+  }
+
+  function getBondProtectChance() {
+    var upg = loadUpgrades();
+    return (upg.bondProtect || 0) * 0.15; // 0~75%
+  }
+
+  // 인연 하락을 가로채는 래퍼 (forceChangeBond / changeBondRank)
+  function patchBondChange() {
+    function wrap(fnName) {
+      if (typeof window[fnName] !== 'function' || window[fnName].__v116) return;
+      var prev = window[fnName];
+      window[fnName] = function (delta) {
+        var d = Number(delta) || 0;
+        if (d < 0) {
+          if (isBondLocked()) {
+            try {
+              if (typeof appendMessage === 'function') {
+                appendMessage('시스템', '인연 고정권이 적용 중입니다. 하락이 차단되었습니다.', true, '인연 시스템', null, { hideActions: true });
+              }
+            } catch (e) {}
+            return;
+          }
+          var chance = getBondProtectChance();
+          if (chance > 0 && Math.random() < chance) {
+            try {
+              if (typeof appendMessage === 'function') {
+                appendMessage('시스템', '인연 보호막이 발동했습니다! (하락 방어)', true, '인연 시스템', null, { hideActions: true });
+              }
+            } catch (e) {}
+            return;
+          }
+        }
+        return prev.apply(this, arguments);
+      };
+      window[fnName].__v116 = true;
+    }
+    wrap('forceChangeBond');
+    wrap('changeBondRank');
+  }
+
+  /* ========== 더블 티켓 (인연 티켓 사용 시) ========== */
+  function patchBondTicket() {
+    if (typeof window.useBondTicket !== 'function' || window.useBondTicket.__v116) return;
+    var prev = window.useBondTicket;
+    window.useBondTicket = function () {
+      var items = loadItems();
+      var hasDouble = (items.doubleTicket || 0) > 0;
+      var ret = prev.apply(this, arguments);
+      if (hasDouble) {
+        try {
+          if (typeof forceChangeBond === 'function') forceChangeBond(1);
+          else if (typeof changeBondRank === 'function') changeBondRank(1);
+        } catch (e) {}
+        items.doubleTicket -= 1;
+        saveItems(items);
+        try {
+          if (typeof appendMessage === 'function') {
+            appendMessage('시스템', '더블 티켓 효과로 인연이 추가로 상승했습니다!', true, '인연 시스템', null, { hideActions: true });
+          }
+        } catch (e) {}
+      }
+      return ret;
+    };
+    window.useBondTicket.__v116 = true;
+  }
+
+  /* ========== 아이템 사용 함수 ========== */
+  window.v116UseBondLock = function () {
+    var items = loadItems();
+    if ((items.bondLock || 0) < 1) {
+      alert('인연 고정권이 없습니다.');
+      return;
+    }
+    items.bondLock -= 1;
+    saveItems(items);
+    var until = Date.now() + 24 * 60 * 60 * 1000;
+    ss(BOND_LOCK_KEY, String(until));
+    alert('인연 고정권이 적용되었습니다. 24시간 동안 인연 하락이 차단됩니다.');
+    if (typeof renderV116Shop === 'function') renderV116Shop();
+  };
+
+  window.v116UseResetPity = function () {
+    var items = loadItems();
+    if ((items.resetPity || 0) < 1) {
+      alert('천장 초기화권이 없습니다.');
+      return;
+    }
+    var pityKeys = [
+      'PRANA_GACHA_PITY',
+      'PRANA_GACHA_COUNT',
+      'PRANA_PITY_COUNT',
+      'PRANA_V85_PITY'
+    ];
+    pityKeys.forEach(function (k) {
+      try { ss(k, '0'); } catch (e) {}
+    });
+    items.resetPity -= 1;
+    saveItems(items);
+    alert('가챠 천장 카운트를 초기화했습니다.');
+    if (typeof renderV116Shop === 'function') renderV116Shop();
+  };
+
+  window.v116UseSecretHint = function () {
+    var items = loadItems();
+    if ((items.secretHint || 0) < 1) {
+      alert('비밀 학생 단서가 없습니다.');
+      return;
+    }
+    var P = {};
+    try {
+      if (typeof getPersonas === 'function') P = getPersonas() || {};
+    } catch (e) {}
+    var candidates = [];
+    Object.keys(P).forEach(function (id) {
+      var p = P[id];
+      if (!p || p.isGroup) return;
+      var owned = true;
+      try {
+        if (typeof isStudentOwned === 'function') owned = isStudentOwned(id);
+        else {
+          var raw = sg('PRANA_OWNED_STUDENTS');
+          var arr = raw ? JSON.parse(raw) : [];
+          owned = Array.isArray(arr) && arr.indexOf(id) >= 0;
+        }
+      } catch (e2) { owned = true; }
+      if (!owned) candidates.push({ id: id, name: p.name || id, desc: (p.desc || p.title || '').slice(0, 40) });
+    });
+    if (!candidates.length) {
+      alert('모집 가능한(미보유) 학생이 없습니다.');
+      return;
+    }
+    var pick = candidates[Math.floor(Math.random() * candidates.length)];
+    items.secretHint -= 1;
+    saveItems(items);
+    alert('단서 획득!\n\n학생: ' + pick.name + '\n힌트: ' + (pick.desc || '정보가 부족합니다. 조금 더 탐색해 보세요.'));
+    if (typeof renderV116Shop === 'function') renderV116Shop();
+  };
+
+  window.v116UseRoomTheme = function () {
+    var items = loadItems();
+    if ((items.roomTheme || 0) < 1) {
+      alert('특별 배경 해금권이 없습니다.');
+      return;
+    }
+    var key = 'PRANA_V116_UNLOCKED_ROOMS';
+    var list = [];
+    try { list = JSON.parse(sg(key) || '[]'); } catch (e) { list = []; }
+    if (!Array.isArray(list)) list = [];
+    var themes = ['moonlight_schale', 'cherry_rooftop', 'rainy_cafe', 'starry_observatory', 'festival_night'];
+    var remain = themes.filter(function (t) { return list.indexOf(t) < 0; });
+    if (!remain.length) {
+      alert('이미 모든 특별 배경을 해금했습니다.');
+      return;
+    }
+    var chosen = remain[Math.floor(Math.random() * remain.length)];
+    list.push(chosen);
+    ss(key, JSON.stringify(list));
+    items.roomTheme -= 1;
+    saveItems(items);
+    alert('특별 배경 「' + chosen + '」이(가) 해금되었습니다!\n배경 설정에서 선택해 보세요.');
+    if (typeof renderV116Shop === 'function') renderV116Shop();
+  };
+
+  window.v116UseDutySkip = function () {
+    var items = loadItems();
+    if ((items.dutySkip || 0) < 1) {
+      alert('당번 스킵권이 없습니다.');
+      return;
+    }
+    try {
+      if (typeof window.__v114EnsureDuty === 'function') window.__v114EnsureDuty();
+    } catch (e) {}
+    var dutyRaw = sg('PRANA_V114_DUTY') || sg('PRANA_DUTY_DATA') || '';
+    var data = null;
+    try { data = dutyRaw ? JSON.parse(dutyRaw) : null; } catch (e) { data = null; }
+    if (data) {
+      data.todayMemo = (data.todayMemo ? data.todayMemo + '\n' : '') +
+        '· 당번 스킵권으로 자동 완료 (' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ')';
+      data.skipped = true;
+      ss('PRANA_V114_DUTY', JSON.stringify(data));
+    }
+    items.dutySkip -= 1;
+    saveItems(items);
+    alert('오늘 당번 업무를 스킵 처리했습니다.');
+    if (typeof renderV116Shop === 'function') renderV116Shop();
+  };
+
+  window.v116ForceBondUp = function () {
+    var today = new Date().toISOString().slice(0, 10);
+    if (sg(FORCE_BOND_DAY_KEY) === today) {
+      alert('인연 강제 상승은 하루에 한 번만 사용할 수 있습니다.');
+      return;
+    }
+    if (getYongdae() < 30) {
+      alert('용대석이 부족합니다. (필요: 30)');
+      return;
+    }
+    var mode = (typeof currentMode !== 'undefined') ? currentMode : sg('PRANA_MODE');
+    if (!mode || mode === 'group' || mode === 'office' || mode === 'schale') {
+      alert('인연을 올릴 학생을 대화 상대로 선택한 뒤 사용해 주세요.');
+      return;
+    }
+    addYongdae(-30);
+    try {
+      if (typeof forceChangeBond === 'function') forceChangeBond(1);
+      else if (typeof changeBondRank === 'function') changeBondRank(1);
+      else {
+        var ranks = JSON.parse(sg('PRANA_BOND_RANKS') || '{}');
+        var cur = Math.max(1, Math.min(100, Math.floor(Number(ranks[mode]) || 1)));
+        ranks[mode] = Math.min(100, cur + 1);
+        ss('PRANA_BOND_RANKS', JSON.stringify(ranks));
+      }
+    } catch (e) {
+      alert('인연 변경 실패: ' + (e.message || e));
+      addYongdae(30);
+      return;
+    }
+    ss(FORCE_BOND_DAY_KEY, today);
+    alert('용대석 30개를 사용해 인연 랭크 +1');
+    try {
+      if (typeof updateBondRankUI === 'function') updateBondRankUI();
+      if (typeof refreshEconomyUI === 'function') refreshEconomyUI();
+    } catch (e) {}
+  };
+
+  /* ========== 상점 UI 확장 ========== */
+  function ensureV116Style() {
+    if (document.getElementById('v116-yd-style')) return;
+    var s = document.createElement('style');
+    s.id = 'v116-yd-style';
+    s.textContent = [
+      '.v116-section{font-size:12px;font-weight:700;color:var(--accent-color,#8a2be2);margin:14px 0 6px;}',
+      '.v116-use-btn{width:100%;margin-top:6px;padding:10px;border-radius:10px;border:none;color:#fff;font-weight:700;cursor:pointer;font-size:13px;}',
+      '.v116-use-btn.pink{background:#be185d;}',
+      '.v116-use-btn.cyan{background:#0e7490;}',
+      '.v116-use-btn.amber{background:#b45309;}',
+      '.v116-use-btn.violet{background:#6d28d9;}',
+      '.v116-lock-status{font-size:11px;color:#67e8f9;text-align:center;margin:4px 0 8px;}'
+    ].join('');
+    document.head.appendChild(s);
+  }
+
+  window.renderV116Shop = function () {
+    ensureV116Style();
+    var upgList = document.getElementById('v115-yd-upg-list');
+    var itemList = document.getElementById('v115-yd-item-list');
+    if (!upgList || !itemList) {
+      setTimeout(function () {
+        if (document.getElementById('v115-yd-upg-list')) window.renderV116Shop();
+      }, 300);
+      return;
+    }
+
+    var oldSec = document.getElementById('v116-extra-upg');
+    if (oldSec) oldSec.remove();
+    var oldItemSec = document.getElementById('v116-extra-items');
+    if (oldItemSec) oldItemSec.remove();
+    var oldActions = document.getElementById('v116-actions');
+    if (oldActions) oldActions.remove();
+
+    var upg = loadUpgrades();
+    var items = loadItems();
+
+    // ---- 추가 업그레이드 ----
+    var upgHtml = '<p class="v116-section" id="v116-extra-upg">⚙️ 추가 업그레이드 (v11.6)</p>';
+    NEW_UPGRADES.forEach(function (u) {
+      var lv = upg[u.id] || 0;
+      var maxed = lv >= u.max;
+      var cost = maxed ? 0 : u.costs[lv];
+      upgHtml += '<div class="v115-yd-row"><div style="flex:1;min-width:0;"><strong>' + u.name +
+        ' <span style="color:var(--accent-color,#8a2be2);">Lv.' + lv + (maxed ? ' MAX' : '') + '</span></strong>' +
+        '<span class="desc">' + u.desc + '</span></div><div style="text-align:right;">' +
+        (maxed ? '<span class="v115-yd-cost">MAX</span>' :
+          '<div class="v115-yd-cost">' + iconImg('yongdae', 14) + cost + '</div>' +
+          '<button type="button" class="v115-yd-btn" onclick="window.v116BuyUpgrade(\'' + u.id + '\')">구매</button>') +
+        '</div></div>';
+    });
+    upgList.insertAdjacentHTML('afterend', upgHtml);
+
+    // ---- 추가 아이템 ----
+    var itemHtml = '<p class="v116-section" id="v116-extra-items">🎁 추가 아이템 (v11.6)</p>';
+    NEW_ITEMS.forEach(function (it) {
+      var held = items[it.id] || 0;
+      itemHtml += '<div class="v115-yd-row"><div style="flex:1;min-width:0;"><strong>' +
+        iconImg(it.icon, 16) + ' ' + it.name + (held ? ' 보유 ' + held : '') +
+        '</strong><span class="desc">' + it.desc + '</span></div><div style="text-align:right;">' +
+        '<div class="v115-yd-cost">' + iconImg('yongdae', 14) + it.cost + '</div>' +
+        '<button type="button" class="v115-yd-btn" onclick="window.v116BuyItem(\'' + it.id + '\')">구매</button></div></div>';
+    });
+    itemList.insertAdjacentHTML('afterend', itemHtml);
+
+    // ---- 사용 버튼 모음 ----
+    var actionHtml = '<div id="v116-actions" style="margin-top:10px;">';
+    if (isBondLocked()) {
+      var left = Math.max(0, Number(sg(BOND_LOCK_KEY) || 0) - Date.now());
+      var hours = Math.ceil(left / (60 * 60 * 1000));
+      actionHtml += '<p class="v116-lock-status">🛡️ 인연 고정권 적용 중 (약 ' + hours + '시간 남음)</p>';
+    }
+    if ((items.bondLock || 0) > 0) {
+      actionHtml += '<button type="button" class="v116-use-btn pink" onclick="window.v116UseBondLock()">인연 고정권 사용 (보유 ' + items.bondLock + ')</button>';
+    }
+    if ((items.doubleTicket || 0) > 0) {
+      actionHtml += '<p style="font-size:11px;color:#8a9bb0;text-align:center;margin:6px 0 0;">더블 티켓 ' + items.doubleTicket + '장 보유 중 – 인연 티켓 사용 시 자동 소모</p>';
+    }
+    if ((items.resetPity || 0) > 0) {
+      actionHtml += '<button type="button" class="v116-use-btn amber" onclick="window.v116UseResetPity()">천장 초기화권 사용 (보유 ' + items.resetPity + ')</button>';
+    }
+    if ((items.secretHint || 0) > 0) {
+      actionHtml += '<button type="button" class="v116-use-btn cyan" onclick="window.v116UseSecretHint()">비밀 학생 단서 사용 (보유 ' + items.secretHint + ')</button>';
+    }
+    if ((items.roomTheme || 0) > 0) {
+      actionHtml += '<button type="button" class="v116-use-btn violet" onclick="window.v116UseRoomTheme()">특별 배경 해금 (보유 ' + items.roomTheme + ')</button>';
+    }
+    if ((items.dutySkip || 0) > 0) {
+      actionHtml += '<button type="button" class="v116-use-btn pink" onclick="window.v116UseDutySkip()">당번 스킵권 사용 (보유 ' + items.dutySkip + ')</button>';
+    }
+    actionHtml += '<button type="button" class="v116-use-btn violet" onclick="window.v116ForceBondUp()">인연 강제 +1 (용대석 30 · 하루 1회)</button>';
+    actionHtml += '</div>';
+
+    var msg = document.getElementById('v115-yd-msg');
+    if (msg) msg.insertAdjacentHTML('beforebegin', actionHtml);
+    else itemList.insertAdjacentHTML('afterend', actionHtml);
+  };
+
+  window.v116BuyUpgrade = function (id) {
+    var u = NEW_UPGRADES.find(function (x) { return x.id === id; });
+    if (!u) return;
+    var upg = loadUpgrades();
+    var lv = upg[id] || 0;
+    if (lv >= u.max) { alert('이미 최대 레벨입니다.'); return; }
+    var cost = u.costs[lv];
+    if (getYongdae() < cost) { alert('용대석이 부족합니다. (필요: ' + cost + ')'); return; }
+    addYongdae(-cost);
+    upg[id] = lv + 1;
+    saveUpgrades(upg);
+    var msg = document.getElementById('v115-yd-msg');
+    if (msg) msg.textContent = u.name + ' → Lv.' + upg[id] + ' 업그레이드 완료!';
+    if (typeof renderShop === 'function') {
+      try { renderShop(); } catch (e) {}
+    }
+    renderV116Shop();
+  };
+
+  window.v116BuyItem = function (id) {
+    var it = NEW_ITEMS.find(function (x) { return x.id === id; });
+    if (!it) return;
+    if (getYongdae() < it.cost) { alert('용대석이 부족합니다. (필요: ' + it.cost + ')'); return; }
+    addYongdae(-it.cost);
+    var items = loadItems();
+    items[id] = (items[id] || 0) + 1;
+    saveItems(items);
+    var msg = document.getElementById('v115-yd-msg');
+    if (msg) msg.textContent = it.name + ' +1';
+    if (typeof renderShop === 'function') {
+      try { renderShop(); } catch (e) {}
+    }
+    renderV116Shop();
+  };
+
+  /* ========== 기존 openYongdaeShop 훅 ========== */
+  function hookOpenShop() {
+    if (typeof window.openYongdaeShop !== 'function') return;
+    if (window.openYongdaeShop.__v116) return;
+    var prev = window.openYongdaeShop;
+    window.openYongdaeShop = function () {
+      prev.apply(this, arguments);
+      setTimeout(function () { renderV116Shop(); }, 80);
+    };
+    window.openYongdaeShop.__v116 = true;
+  }
+
+  /* ========== 부팅 ========== */
+  function boot() {
+    patchBondChange();
+    patchBondTicket();
+    hookOpenShop();
+    console.log('[PRANA] v11.6 Yongdae Expand ready');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+<!-- ========== v11.6 끝 ========== -->
+
 </html>
