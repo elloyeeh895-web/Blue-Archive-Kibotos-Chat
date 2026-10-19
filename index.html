@@ -2486,7 +2486,7 @@ window.openV10Hub = function (tab) {
         id: 'shiroko_terror', name: '시로코*테러', title: '시로코*테러 (Shiroko*Terror)', sub: '아비도스 대책위원회 • 다른 세계의 시로코', avatar: '🖤',
         greeting: '응... 안녕, 선생님. 다시 만날 수 있어서... 다행이야.',
         theme: { bg: '#080a10', card: '#121520', accent: '#38bdf8', text: '#e2e8f0', headerText: '#e2e8f0', botBubble: '#181d2d', botText: '#f1f5f9', userBubble: '#0284c7', userText: '#ffffff', border: '#262d42', avatarBg: 'linear-gradient(135deg, #1e1b4b, #0284c7)', avatarBorder: '#38bdf8' },
-        prompt: `당신은 게임 '블루 아카이브'의 다른 세계에서 온 '시로코*테러'입니다. 존댓말을 절대 쓰지 않고 반드시 반말만 사용하세요(~했어, ~야, ~ 다행이야). 조용하고 무덤덤하지만 깊이 아끼고 그리워하는 마음을 가지고 있습니다. "응..."이라는 표현을 자주 사용하며, 조금 쓸쓸하면서도 다정한 어조로 2~3문장으로 답변하세요.`
+        prompt: `당신은 게임 '블루 아카이브'의 다른 세계에서 온 '시로코*테러'입니다. 존댓말을 절대 쓰지 않고 반드시 반말만 사용하세요(~했어, ~야, ~ 다행이야). 유저를 부를 때는 반드시 '선생님'이라고만 부르세요. (금지: 너, 네가, 너는, 너를, 너랑, 당신 — 올바른 예: 선생님이, 선생님은, 선생님을, 선생님이랑, 선생님도) 조용하고 무덤덤하지만 깊이 아끼고 그리워하는 마음을 가지고 있습니다. "응..."이라는 표현을 자주 사용하며, 조금 쓸쓸하면서도 다정한 어조로 2~3문장으로 답변하세요.`
       },
       hoshino: {
         id: 'hoshino', name: '호시노', title: '타카나시 호시노 (Hoshino)', sub: '아비도스 대책위원회 • 부회장', avatar: '💤',
@@ -4566,6 +4566,9 @@ ${bondNote}
         if (loadingRowElem) loadingRowElem.remove();
 
         if (responseText) {
+          if (persona && persona.id === 'shiroko_terror' && typeof window.sanitizeShirokoTerrorAddress === 'function') {
+            responseText = window.sanitizeShirokoTerrorAddress(responseText);
+          }
           const modelHistoryIndex = conversationHistory.length;
           conversationHistory.push({ role: 'model', parts: [{ text: responseText }] });
 
@@ -5197,6 +5200,22 @@ ${bondNote}
     if (id === 'shiroko' || id === 'shiroko_terror') {
       if (line1.indexOf('응') !== 0) line1 = '응... ' + line1;
     }
+    if (id === 'shiroko_terror') {
+      // 시로코*테러: 유저를 항상 「선생님」으로 (너/네가 금지)
+      line1 = line1
+        .replace(/네가/g, '선생님이')
+        .replace(/너는/g, '선생님은')
+        .replace(/너를/g, '선생님을')
+        .replace(/너만/g, '선생님만')
+        .replace(/너랑/g, '선생님이랑')
+        .replace(/너와/g, '선생님이랑')
+        .replace(/너도/g, '선생님도')
+        .replace(/너의/g, '선생님의')
+        .replace(/네 목소리/g, '선생님 목소리')
+        .replace(/네 얼굴/g, '선생님 얼굴')
+        .replace(/\b너\b/g, '선생님')
+        .replace(/네(?=\s)/g, '선생님');
+    }
     if (id === 'hoshino') {
       line1 = line1
         .replace(/선생님/g, '선생')
@@ -5239,7 +5258,10 @@ ${bondNote}
 
     await new Promise(function (r) { setTimeout(r, 400 + Math.random() * 500); });
 
-    const responseText = getDemoResponse(persona, userText);
+    let responseText = getDemoResponse(persona, userText);
+    if (persona && persona.id === 'shiroko_terror' && typeof window.sanitizeShirokoTerrorAddress === 'function') {
+      responseText = window.sanitizeShirokoTerrorAddress(responseText);
+    }
     const loadingRowElem = document.getElementById('loading-row');
     if (loadingRowElem) loadingRowElem.remove();
 
@@ -5343,10 +5365,10 @@ ${bondNote}
       night: function (u) { return '응... 아직 안 자? 무리하면 내일 조깅 못 해. 얼른 자.'; }
     },
     shiroko_terror: {
-      morning: function (u) { return '응... 아침이네. 네가 있어서… 오늘도 시작할 수 있을 것 같아.'; },
-      afternoon: function (u) { return '응... 오후 햇살이 따뜻하다. 잠깐 같이 있어도 돼?'; },
-      evening: function (u) { return '저녁이야… 오늘 하루, 너랑 이야기해서 괜찮았어.'; },
-      night: function (u) { return '응... 밤이 길다. 그래도 네가 오면, 조금은 덜 쓸쓸해.'; }
+      morning: function (u) { return '응... 아침이네. 선생님이 있어서… 오늘도 시작할 수 있을 것 같아.'; },
+      afternoon: function (u) { return '응... 오후 햇살이 따뜻하다. 선생님, 잠깐 같이 있어도 돼?'; },
+      evening: function (u) { return '저녁이야… 오늘 하루, 선생님이랑 이야기해서 괜찮았어.'; },
+      night: function (u) { return '응... 밤이 길다. 그래도 선생님이 오면, 조금은 덜 쓸쓸해.'; }
     },
     hoshino: {
       morning: function (u) { return '으헤~ 아침부터 선생이야? 아저씨는 아직 자고 싶은데… 뭐, 잠깐 일어나 줄게.'; },
@@ -8563,7 +8585,7 @@ ${bondNote}
       prana: { style: 'polite', address: null, note: '차분·정중 존댓(~입니다/~세요). 반말 금지. 시스템 지원 톤.' },
       arona: { style: 'energetic_polite', address: null, note: '밝고 귀여운 존댓/해요체. "빠밤-!" 사용. 텐션 높음.' },
       shiroko: { style: 'soft', address: null, note: '반말만. "응..." 자주. 무덤덤·단정. 존댓 금지.' },
-      shiroko_terror: { style: 'soft', address: null, note: '반말만. "응..." 자주. 쓸쓸하고 다정. 존댓 금지.' },
+      shiroko_terror: { style: 'soft', address: '선생님', note: '반말만. 유저=반드시 「선생님」(너/네가/너는/너를/너랑 금지). "응..." 자주. 쓸쓸하고 다정. 존댓 금지.' },
       hoshino: { style: 'banmal', address: '선생', note: '반말. 자신=아저씨, 유저=반드시 「선생」(네가/너 금지, 「선생이/선생은/선생을」). "으헤~". 느긋.' },
       nonomi: { style: 'energetic_polite', address: null, note: '밝은 존댓(~에요/~랍니다☆). 스위트·간식.' },
       serika: { style: 'tsundere', address: null, note: '츤데레 반말. "바,바보!" "아니거든!". 존댓 금지.' },
@@ -8834,6 +8856,25 @@ ${bondNote}
     if (id === 'arona') line = '빠밤-! ' + line;
     if (id === 'shiroko' || id === 'shiroko_terror') {
       if (line.indexOf('응') !== 0) line = '응... ' + line.replace(/^응\.\.\.\s*/, '');
+    }
+    if (id === 'shiroko_terror') {
+      // 시로코*테러: 유저를 항상 「선생님」으로 (너/네가 금지)
+      line = line
+        .replace(/네가/g, '선생님이')
+        .replace(/너는/g, '선생님은')
+        .replace(/너를/g, '선생님을')
+        .replace(/너만/g, '선생님만')
+        .replace(/너랑/g, '선생님이랑')
+        .replace(/너와/g, '선생님이랑')
+        .replace(/너도/g, '선생님도')
+        .replace(/너의/g, '선생님의')
+        .replace(/네 목소리/g, '선생님 목소리')
+        .replace(/네 얼굴/g, '선생님 얼굴')
+        .replace(/네 곁/g, '선생님 곁')
+        .replace(/네 하루/g, '선생님 하루')
+        .replace(/네 이야기/g, '선생님 이야기')
+        .replace(/\b너\b/g, '선생님')
+        .replace(/네(?=\s)/g, '선생님');
     }
     if (id === 'hoshino') {
       // 호시노는 유저를 항상 「선생」으로 부름 (네가/너/네 → 선생이/선생)
@@ -22771,6 +22812,9 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
       if (lr) lr.remove();
 
       if (responseText) {
+        if (persona && persona.id === 'shiroko_terror' && typeof window.sanitizeShirokoTerrorAddress === 'function') {
+          responseText = window.sanitizeShirokoTerrorAddress(responseText);
+        }
         try {
           if (typeof conversationHistory !== 'undefined' && Array.isArray(conversationHistory)) {
             conversationHistory.push({ role: 'model', parts: [{ text: responseText }] });
