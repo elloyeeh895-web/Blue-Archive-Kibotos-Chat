@@ -816,30 +816,28 @@
     }
     .v75-ambiance-layer {
       pointer-events: none; position: fixed; inset: 0; z-index: 0; overflow: hidden;
-      opacity: 0; transition: opacity 0.4s;
-      contain: strict;
-      transform: translateZ(0);
+      opacity: 0; transition: opacity 0.6s;
     }
-    body.v75-ambiance-on .v75-ambiance-layer { opacity: 1; }
-
+    body.v75-ambiance-on .v75-ambiance-layer { opacity: 1 !important; }
+    body.v75-ambiance-off .v75-ambiance-layer { opacity: 0 !important; visibility: hidden !important; }
     body.v75-ambiance-paused .v75-particle { animation-play-state: paused !important; }
     body.v75-ambiance-on header,
     body.v75-ambiance-on #chat-container,
     body.v75-ambiance-on footer,
     body.v75-ambiance-on .mention-bar,
     body.v75-ambiance-on .v75-demo-banner { position: relative; z-index: 1; }
-    /* 끊김 최소화: opacity 키프레임 제거, transform만 사용 */
     .v75-particle {
       position: absolute; border-radius: 50%;
-      background: var(--accent-color); opacity: 0.14;
+      background: var(--accent-color); opacity: 0.18;
       animation: v75-float linear infinite;
-      will-change: transform;
-      transform: translate3d(0, 110vh, 0);
+      will-change: transform, opacity;
       backface-visibility: hidden;
     }
     @keyframes v75-float {
-      0% { transform: translate3d(0, 110vh, 0); }
-      100% { transform: translate3d(0, -10vh, 0); }
+      0% { transform: translate3d(0, 110vh, 0) scale(0.6); opacity: 0; }
+      15% { opacity: 0.22; }
+      85% { opacity: 0.12; }
+      100% { transform: translate3d(0, -10vh, 0) scale(1.1); opacity: 0; }
     }
     .v75-time-tint {
       position: absolute; inset: 0;
@@ -6223,10 +6221,9 @@ ${bondNote}
   if (['low','mid','high'].indexOf(ambianceDensity) < 0) ambianceDensity = 'mid';
 
   function particleCountForDensity() {
-    // 끊김 최소화: 입자 수 최소화
-    if (ambianceDensity === 'low') return 3;
-    if (ambianceDensity === 'high') return 8;
-    return 5;
+    if (ambianceDensity === 'low') return 8;
+    if (ambianceDensity === 'high') return 28;
+    return 14;
   }
   function sizeRangeFor() {
     if (ambianceSize === 'small') return [2, 4];
@@ -6238,17 +6235,9 @@ ${bondNote}
   function rebuildAmbianceParticles() {
     const layer = document.getElementById('v75-ambiance-layer');
     if (!layer) return null;
-    // 사이트 로딩 중에는 입자 생성 미룸 (첫 페인트·파싱과 겹치면 끊김)
-    if (document.readyState !== 'complete') {
-      if (!window.__v75AmbPending) {
-        window.__v75AmbPending = true;
-        window.addEventListener('load', function () {
-          window.__v75AmbPending = false;
-          var run = function () { try { if (ambianceOn) rebuildAmbianceParticles(); applyAmbiance(); } catch (e) {} };
-          if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 1200 });
-          else setTimeout(run, 400);
-        }, { once: true });
-      }
+    if (!ambianceOn) {
+      var gone = layer.querySelectorAll('.v75-particle');
+      for (var j = 0; j < gone.length; j++) gone[j].remove();
       return layer;
     }
     var old = layer.querySelectorAll('.v75-particle');
@@ -6265,8 +6254,8 @@ ${bondNote}
         p.style.height = size + 'px';
       }
       p.style.left = Math.random() * 100 + '%';
-      p.style.animationDuration = (18 + Math.random() * 22) + 's';
-      p.style.animationDelay = (-Math.random() * 20) + 's';
+      p.style.animationDuration = (10 + Math.random() * 18) + 's';
+      p.style.animationDelay = (Math.random() * 12) + 's';
       layer.appendChild(p);
     }
     return layer;
@@ -6305,15 +6294,16 @@ ${bondNote}
     if (menuBtn) menuBtn.textContent = ambianceOn ? '✨ 분위기 연출 설정 (ON)' : '✨ 분위기 연출 설정 (OFF)';
   }
   function applyAmbiance() {
-    ensureAmbianceLayer();
     var layer = document.getElementById('v75-ambiance-layer');
     if (ambianceOn) {
       document.body.classList.add('v75-ambiance-on');
+      document.body.classList.remove('v75-ambiance-off');
       if (layer) {
         layer.style.opacity = '';
+        layer.style.visibility = '';
         layer.setAttribute('aria-hidden', 'false');
-        if (!layer.querySelector('.v75-particle')) rebuildAmbianceParticles();
       }
+      rebuildAmbianceParticles();
       var h = new Date().getHours();
       var color = 'transparent';
       if (h >= 5 && h < 8) color = '#fbbf2444';
@@ -6322,12 +6312,13 @@ ${bondNote}
       else color = '#38bdf822';
       document.documentElement.style.setProperty('--v75-tint', color);
     } else {
-      // OFF: 클래스·입자·틴트 모두 제거 (시즌 CSS !important 도 무시하도록 인라인 숨김)
       document.body.classList.remove('v75-ambiance-on');
+      document.body.classList.add('v75-ambiance-off');
       if (layer) {
-        var old = layer.querySelectorAll('.v75-particle');
-        for (var i = 0; i < old.length; i++) old[i].remove();
+        var oldP = layer.querySelectorAll('.v75-particle');
+        for (var i = 0; i < oldP.length; i++) oldP[i].remove();
         layer.style.opacity = '0';
+        layer.style.visibility = 'hidden';
         layer.setAttribute('aria-hidden', 'true');
       }
       document.documentElement.style.setProperty('--v75-tint', 'transparent');
@@ -6338,6 +6329,10 @@ ${bondNote}
     ambianceOn = !ambianceOn;
     safeSet(AMBIANCE_KEY, ambianceOn ? 'true' : 'false');
     applyAmbiance();
+    try {
+      var msg2 = document.getElementById('ambiance-msg');
+      if (msg2 && !msg2.textContent) msg2.textContent = ambianceOn ? '분위기 연출 ON' : '분위기 연출 OFF';
+    } catch (e) {}
   }
   window.toggleAmbianceFromModal = function () {
     toggleAmbiance();
