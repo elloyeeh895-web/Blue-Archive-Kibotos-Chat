@@ -10659,7 +10659,16 @@ try {
     if (typeof window.sendMessage !== 'function' || window.sendMessage.__v92Hooked) return;
     const original = window.sendMessage;
     const wrapped = async function () { const input = document.getElementById('user-input'); const text = input && input.value.trim(); if (text) { const id = currentId(); bump('messages', 1, isGroup(id) ? id : null); if (isGroup(id)) { bump('groupMessages', 1, id); changeRelation(id, [], 1); } } return original.apply(this, arguments); };
-    wrapped.__v92Hooked = true; window.sendMessage = wrapped;
+    wrapped.__v92Hooked = true;
+    // 다른 훅 플래그 유지 (재설치 시 무한 래핑 방지)
+    if (original.__pranaModeGuard) wrapped.__pranaModeGuard = true;
+    if (original.__v94Choice) wrapped.__v94Choice = true;
+    if (original.__v111ws) wrapped.__v111ws = true;
+    if (original.__v113img) wrapped.__v113img = true;
+    if (original.__v114schale) wrapped.__v114schale = true;
+    wrapped.__pranaPrev = original;
+    window.sendMessage = wrapped;
+    try { sendMessage = wrapped; } catch (e) {}
   }
   function boot() { injectUI(); observeChat(); hookSend(); checkAchievements(); updateTitleDisplay(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
@@ -11123,7 +11132,14 @@ try {
       return result;
     };
     wrapped.__v94Choice = true;
+    if (original.__pranaModeGuard) wrapped.__pranaModeGuard = true;
+    if (original.__v92Hooked) wrapped.__v92Hooked = true;
+    if (original.__v111ws) wrapped.__v111ws = true;
+    if (original.__v113img) wrapped.__v113img = true;
+    if (original.__v114schale) wrapped.__v114schale = true;
+    wrapped.__pranaPrev = original;
     window.sendMessage = wrapped;
+    try { sendMessage = wrapped; } catch (e) {}
   }
 
   // 데모 경로도 훅 (sendMessage 내부에서 호출될 수 있음)
@@ -21071,16 +21087,39 @@ body.v97-season-on.v75-ambiance-on .v75-ambiance-layer { opacity:1 !important; }
     else alert(name + ' 학생과의 대화가 OFF로 설정되어 있습니다.');
   }
   function installSendGuard() {
-    if (typeof sendMessage !== 'function' || sendMessage.__pranaModeGuard) return;
-    originalSend = sendMessage;
+    // window/global 어느 쪽이든 이미 가드되어 있으면 재설치 금지 (공유 originalSend 재할당으로 인한 무한 재귀 방지)
+    var current = null;
+    try { if (typeof window.sendMessage === 'function') current = window.sendMessage; } catch (e) {}
+    try { if (!current && typeof sendMessage === 'function') current = sendMessage; } catch (e) {}
+    if (!current) return;
+    if (current.__pranaModeGuard) return;
+    // 체인에 이미 가드가 있으면 플래그만 승격
+    var probe = current;
+    var seen = 0;
+    while (probe && seen < 12) {
+      if (probe.__pranaModeGuard) {
+        try { current.__pranaModeGuard = true; } catch (e) {}
+        return;
+      }
+      probe = probe.__pranaPrev || null;
+      seen++;
+    }
+    var prevFn = current;
     var guarded = async function () {
       if (stopped) return;
       if (currentStudentBlocked()) { blockedNotice(); return; }
-      return originalSend.apply(this, arguments);
+      return prevFn.apply(this, arguments);
     };
     guarded.__pranaModeGuard = true;
-    sendMessage = guarded;
-    window.sendMessage = guarded;
+    guarded.__pranaPrev = prevFn;
+    // 기존 훅 플래그 유지
+    if (prevFn.__v92Hooked) guarded.__v92Hooked = true;
+    if (prevFn.__v94Choice) guarded.__v94Choice = true;
+    if (prevFn.__v111ws) guarded.__v111ws = true;
+    if (prevFn.__v113img) guarded.__v113img = true;
+    if (prevFn.__v114schale) guarded.__v114schale = true;
+    try { window.sendMessage = guarded; } catch (e) {}
+    try { sendMessage = guarded; } catch (e) {}
   }
   function installMenuButton() {
     var list = document.querySelector('#main-menu-modal .menu-list');
