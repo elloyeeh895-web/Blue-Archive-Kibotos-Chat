@@ -25550,4 +25550,390 @@ body.v112-hide-avatar .avatar-wrap{display:none!important}
 </script>
 <!-- ========== v11.7 끝 ========== -->
 
+
+<!-- ========== v11.8 시작: 말풍선 스타일 + 분위기 아이템 상점 확장 ========== -->
+<script>
+(function () {
+  'use strict';
+  if (window.__PRANA_V118__) return;
+  window.__PRANA_V118__ = true;
+
+  var BUBBLE_KEY = 'PRANA_V118_BUBBLE_STYLES';
+  var BUBBLE_ACTIVE = 'PRANA_V118_ACTIVE_BUBBLE';
+  var AMBI_KEY = 'PRANA_V118_AMBI_ITEMS';
+  var AMBI_ACTIVE = 'PRANA_V118_ACTIVE_AMBI';
+
+  function sg(k) {
+    try { return localStorage.getItem(k) || ''; } catch (e) {
+      return (typeof safeGet === 'function') ? (safeGet(k) || '') : '';
+    }
+  }
+  function ss(k, v) {
+    try { localStorage.setItem(k, String(v)); } catch (e) {
+      if (typeof safeSet === 'function') safeSet(k, String(v));
+    }
+  }
+  function getPyro() {
+    try {
+      if (typeof window.getCrysteralios === 'function') return Math.max(0, Math.floor(window.getCrysteralios() || 0));
+    } catch (e) {}
+    return Math.max(0, Math.floor(Number(sg('PRANA_CRYSTERALIOS') || 0) || 0));
+  }
+  function addPyro(n) {
+    try {
+      if (typeof window.addCrysteralios === 'function') return window.addCrysteralios(n);
+    } catch (e) {}
+    var cur = getPyro();
+    var next = Math.max(0, cur + Math.floor(n || 0));
+    ss('PRANA_CRYSTERALIOS', String(next));
+    return next;
+  }
+
+  var BUBBLE_STYLES = [
+    { id: 'default', name: '기본', desc: '기본 말풍선', cost: 0, css: '' },
+    { id: 'round-soft', name: '둥근 소프트', desc: '부드러운 둥근 모서리 + 살짝 그림자', cost: 35,
+      css: '.message.bot{border-radius:18px;border-top-left-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.25);}' },
+    { id: 'sharp', name: '각진 모던', desc: '직선적이고 깔끔한 각진 말풍선', cost: 30,
+      css: '.message.bot{border-radius:4px;border-top-left-radius:0;}' },
+    { id: 'glow-border', name: '글로우 테두리', desc: '은은한 보라 발광 테두리', cost: 50,
+      css: '.message.bot{border:1px solid color-mix(in srgb,var(--accent-color) 55%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--accent-color) 25%,transparent),0 0 12px color-mix(in srgb,var(--accent-color) 20%,transparent);}' },
+    { id: 'glass', name: '글래스 반투명', desc: '유리 느낌의 반투명 말풍선', cost: 55,
+      css: '.message.bot{background:color-mix(in srgb,var(--bot-bubble) 72%,transparent)!important;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);}' },
+    { id: 'left-accent', name: '왼쪽 액센트 바', desc: '왼쪽에 포인트 컬러 바', cost: 40,
+      css: '.message.bot{border-left:3px solid var(--accent-color);border-top-left-radius:2px;padding-left:12px;}' },
+    { id: 'soft-fill', name: '소프트 필', desc: '연한 그라데이션 배경', cost: 45,
+      css: '.message.bot{background:linear-gradient(135deg,color-mix(in srgb,var(--bot-bubble) 90%,var(--accent-color)),var(--bot-bubble))!important;}' },
+    { id: 'outline-only', name: '아웃라인만', desc: '배경 거의 없이 테두리만', cost: 40,
+      css: '.message.bot{background:transparent!important;border:1.5px solid var(--accent-color);color:var(--text-color);}' }
+  ];
+
+  var AMBI_ITEMS = [
+    { id: 'default', name: '기본', desc: '기본 분위기', cost: 0, type: 'none' },
+    { id: 'particle-star', name: '별빛 파티클', desc: '반짝이는 별 모양 파티클 강화', cost: 60, type: 'particle', className: 'v118-ambi-star' },
+    { id: 'particle-sakura', name: '벚꽃 파티클', desc: '분홍 벚꽃잎이 천천히 내려옴', cost: 70, type: 'particle', className: 'v118-ambi-sakura' },
+    { id: 'particle-rain', name: '비 파티클', desc: '은은한 빗줄기 효과', cost: 55, type: 'particle', className: 'v118-ambi-rain' },
+    { id: 'tint-aurora', name: '오로라 틴트', desc: '상단에 오로라 느낌의 그라데이션', cost: 50, type: 'tint', className: 'v118-ambi-aurora' },
+    { id: 'tint-sunset', name: '석양 틴트', desc: '따뜻한 석양빛 오버레이', cost: 45, type: 'tint', className: 'v118-ambi-sunset' },
+    { id: 'logo-gold', name: 'SCHALE 골드 로고', desc: '황금빛 SCHALE 로고 오버레이', cost: 65, type: 'logo', className: 'v118-logo-gold' },
+    { id: 'logo-cyan', name: 'SCHALE 시안 로고', desc: '시안빛 SCHALE 로고 오버레이', cost: 65, type: 'logo', className: 'v118-logo-cyan' },
+    { id: 'viz-neon', name: '네온 파형', desc: 'BGM 시각화 네온 컬러 테마', cost: 50, type: 'viz', className: 'v118-viz-neon' },
+    { id: 'viz-warm', name: '웜 파형', desc: 'BGM 시각화 따뜻한 주황·분홍', cost: 50, type: 'viz', className: 'v118-viz-warm' }
+  ];
+
+  function loadUnlocked(key, fallback) {
+    try {
+      var arr = JSON.parse(sg(key) || JSON.stringify(fallback));
+      if (!Array.isArray(arr)) arr = fallback.slice();
+      if (arr.indexOf('default') < 0) arr.unshift('default');
+      return arr;
+    } catch (e) { return fallback.slice(); }
+  }
+  function saveUnlocked(key, arr) { ss(key, JSON.stringify(arr)); }
+
+  function getActiveBubble() {
+    var id = sg(BUBBLE_ACTIVE) || 'default';
+    var unlocked = loadUnlocked(BUBBLE_KEY, ['default']);
+    if (unlocked.indexOf(id) < 0) id = 'default';
+    return id;
+  }
+  function setActiveBubble(id) {
+    ss(BUBBLE_ACTIVE, id);
+    applyBubbleStyle(id);
+  }
+
+  function getActiveAmbi() {
+    var id = sg(AMBI_ACTIVE) || 'default';
+    var unlocked = loadUnlocked(AMBI_KEY, ['default']);
+    if (unlocked.indexOf(id) < 0) id = 'default';
+    return id;
+  }
+  function setActiveAmbi(id) {
+    ss(AMBI_ACTIVE, id);
+    applyAmbiItem(id);
+  }
+
+  function ensureV118CSS() {
+    if (document.getElementById('v118-shop-css')) return;
+    var s = document.createElement('style');
+    s.id = 'v118-shop-css';
+    var bubbleRules = BUBBLE_STYLES.map(function (st) {
+      if (!st.css) return '';
+      return '#chat-container.v118-bubble-' + st.id + ' ' + st.css;
+    }).filter(Boolean).join('\n');
+
+    s.textContent = bubbleRules + `
+body.v118-ambi-star .v75-particle { border-radius: 0 !important; clip-path: polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%); opacity: 0.35; }
+body.v118-ambi-sakura .v75-particle {
+  border-radius: 50% 0 50% 50% !important;
+  background: #f9a8d4 !important;
+  opacity: 0.4;
+}
+body.v118-ambi-rain .v75-particle {
+  width: 2px !important; height: 14px !important; border-radius: 1px !important;
+  background: #93c5fd !important; opacity: 0.35;
+  animation-duration: 2.2s !important;
+}
+body.v118-ambi-aurora .v75-time-tint {
+  background: linear-gradient(180deg, rgba(52,211,153,0.18) 0%, rgba(167,139,250,0.22) 40%, transparent 70%) !important;
+  opacity: 0.55 !important;
+}
+body.v118-ambi-sunset .v75-time-tint {
+  background: linear-gradient(180deg, rgba(251,146,60,0.28) 0%, rgba(244,114,182,0.18) 35%, transparent 65%) !important;
+  opacity: 0.5 !important;
+}
+body.v118-logo-gold #schale-logo-overlay {
+  display: block !important;
+  opacity: 0.32 !important;
+  filter: drop-shadow(0 0 6px #eab308) sepia(1) saturate(3) hue-rotate(5deg) !important;
+}
+body.v118-logo-cyan #schale-logo-overlay {
+  display: block !important;
+  opacity: 0.32 !important;
+  filter: drop-shadow(0 0 6px #22d3ee) hue-rotate(160deg) saturate(1.4) !important;
+}
+#bgm-viz-layer.v118-viz-neon .bgm-wave-bar.up {
+  background: linear-gradient(180deg, #22d3ee 0%, #a78bfa 50%, #f0abfc 100%) !important;
+  box-shadow: 0 0 8px rgba(34,211,238,0.6) !important;
+}
+#bgm-viz-layer.v118-viz-neon .bgm-wave-bar.down {
+  background: linear-gradient(0deg, #f472b6 0%, #c084fc 50%, #f0abfc 100%) !important;
+  box-shadow: 0 0 8px rgba(244,114,182,0.5) !important;
+}
+#bgm-viz-layer.v118-viz-warm .bgm-wave-bar.up {
+  background: linear-gradient(180deg, #fdba74 0%, #fb923c 50%, #fef3c7 100%) !important;
+  box-shadow: 0 0 8px rgba(251,146,60,0.55) !important;
+}
+#bgm-viz-layer.v118-viz-warm .bgm-wave-bar.down {
+  background: linear-gradient(0deg, #fb7185 0%, #f97316 50%, #fecdd3 100%) !important;
+  box-shadow: 0 0 8px rgba(251,113,133,0.5) !important;
+}
+#v117-cr-modal .v117-tabs { flex-wrap: wrap; }
+#v117-cr-modal .v117-tab { min-width: 70px; font-size: 11px; padding: 8px 4px; }
+`;
+    document.head.appendChild(s);
+  }
+
+  function applyBubbleStyle(id) {
+    ensureV118CSS();
+    var box = document.getElementById('chat-container');
+    if (!box) return;
+    BUBBLE_STYLES.forEach(function (st) {
+      box.classList.remove('v118-bubble-' + st.id);
+    });
+    if (id && id !== 'default') box.classList.add('v118-bubble-' + id);
+  }
+
+  function clearAmbiClasses() {
+    ['v118-ambi-star','v118-ambi-sakura','v118-ambi-rain','v118-ambi-aurora','v118-ambi-sunset','v118-logo-gold','v118-logo-cyan']
+      .forEach(function (c) { document.body.classList.remove(c); });
+    var viz = document.getElementById('bgm-viz-layer');
+    if (viz) viz.classList.remove('v118-viz-neon', 'v118-viz-warm');
+  }
+
+  function applyAmbiItem(id) {
+    ensureV118CSS();
+    clearAmbiClasses();
+    if (!id || id === 'default') return;
+    var item = AMBI_ITEMS.find(function (x) { return x.id === id; });
+    if (!item || !item.className) return;
+    if (item.type === 'particle' || item.type === 'tint' || item.type === 'logo') {
+      document.body.classList.add(item.className);
+      if (item.type === 'logo') document.body.classList.add('schale-logo-on');
+      if (item.type === 'particle' || item.type === 'tint') {
+        document.body.classList.add('v75-ambiance-on');
+        document.body.classList.remove('v75-ambiance-off');
+      }
+    } else if (item.type === 'viz') {
+      var viz = document.getElementById('bgm-viz-layer');
+      if (viz) viz.classList.add(item.className);
+    }
+  }
+
+  function patchShopModal() {
+    var m = document.getElementById('v117-cr-modal');
+    if (!m) return false;
+    var tabs = m.querySelector('.v117-tabs');
+    if (!tabs) return false;
+    if (tabs.querySelector('[data-tab="bubble"]')) return true;
+
+    var bubbleTab = document.createElement('button');
+    bubbleTab.type = 'button';
+    bubbleTab.className = 'v117-tab';
+    bubbleTab.setAttribute('data-tab', 'bubble');
+    bubbleTab.textContent = '말풍선';
+    bubbleTab.onclick = function () { window.v117Tab('bubble'); };
+
+    var ambiTab = document.createElement('button');
+    ambiTab.type = 'button';
+    ambiTab.className = 'v117-tab';
+    ambiTab.setAttribute('data-tab', 'ambi');
+    ambiTab.textContent = '분위기';
+    ambiTab.onclick = function () { window.v117Tab('ambi'); };
+
+    var greetTab = tabs.querySelector('[data-tab="greet"]');
+    if (greetTab) {
+      tabs.insertBefore(bubbleTab, greetTab);
+      tabs.insertBefore(ambiTab, greetTab);
+    } else {
+      tabs.appendChild(bubbleTab);
+      tabs.appendChild(ambiTab);
+    }
+
+    var desc = m.querySelector('p');
+    if (desc && desc.textContent.indexOf('텍스트 디자인') >= 0) {
+      desc.innerHTML = '텍스트·말풍선·분위기 아이템과 대체 첫 대사를 구매·적용하세요.<br>결제: 크리스터탤리오스';
+    }
+    return true;
+  }
+
+  function renderBubbleTab(body) {
+    var unlocked = loadUnlocked(BUBBLE_KEY, ['default']);
+    var active = getActiveBubble();
+    body.innerHTML = BUBBLE_STYLES.map(function (st) {
+      var owned = unlocked.indexOf(st.id) >= 0;
+      var isActive = active === st.id;
+      var btn;
+      if (!owned) {
+        btn = '<button type="button" class="v117-btn" onclick="window.v118BuyBubble(\'' + st.id + '\')">구매 ' + st.cost + '</button>';
+      } else if (isActive) {
+        btn = '<button type="button" class="v117-btn gray" disabled>적용 중</button>';
+      } else {
+        btn = '<button type="button" class="v117-btn outline" onclick="window.v118ApplyBubble(\'' + st.id + '\')">적용</button>';
+      }
+      return '<div class="v117-item' + (isActive ? ' active' : '') + '">' +
+        '<div class="preview"><div style="font-size:13px;">선생님, 안녕하세요!</div>' +
+        '<div class="meta"><strong>' + st.name + '</strong> · ' + st.desc + (owned ? ' · 보유' : '') + '</div></div>' +
+        btn + '</div>';
+    }).join('');
+  }
+
+  function renderAmbiTab(body) {
+    var unlocked = loadUnlocked(AMBI_KEY, ['default']);
+    var active = getActiveAmbi();
+    body.innerHTML = '<p style="font-size:12px;color:#8a9bb0;margin-bottom:10px;line-height:1.45;">파티클·틴트·로고·BGM 파형 테마를 적용합니다. 파티클/틴트는 분위기(앰비언스)가 켜져 있을 때 더 잘 보입니다.</p>' +
+      AMBI_ITEMS.map(function (st) {
+        var owned = unlocked.indexOf(st.id) >= 0;
+        var isActive = active === st.id;
+        var btn;
+        if (!owned) {
+          btn = '<button type="button" class="v117-btn" onclick="window.v118BuyAmbi(\'' + st.id + '\')">구매 ' + st.cost + '</button>';
+        } else if (isActive) {
+          btn = '<button type="button" class="v117-btn gray" disabled>적용 중</button>';
+        } else {
+          btn = '<button type="button" class="v117-btn outline" onclick="window.v118ApplyAmbi(\'' + st.id + '\')">적용</button>';
+        }
+        var typeLabel = { particle: '파티클', tint: '틴트', logo: '로고', viz: '파형', none: '기본' }[st.type] || '';
+        return '<div class="v117-item' + (isActive ? ' active' : '') + '">' +
+          '<div class="preview"><strong>' + st.name + '</strong>' +
+          '<div class="meta">' + typeLabel + ' · ' + st.desc + (owned ? ' · 보유' : '') + '</div></div>' +
+          btn + '</div>';
+      }).join('');
+  }
+
+  var _origV117Tab = window.v117Tab;
+  window.v117Tab = function (tab) {
+    patchShopModal();
+    var tabs = document.querySelectorAll('#v117-cr-modal .v117-tab');
+    tabs.forEach(function (t) {
+      t.classList.toggle('on', t.getAttribute('data-tab') === tab);
+    });
+    var body = document.getElementById('v117-body');
+    var bal = document.getElementById('v117-bal');
+    if (bal) {
+      var icon = '';
+      try {
+        var img = bal.querySelector('img');
+        if (img) icon = img.outerHTML + ' ';
+      } catch (e) {}
+      bal.innerHTML = icon + '크리스터탤리오스 <strong>' + getPyro() + '</strong>';
+    }
+    if (!body) return;
+    if (tab === 'bubble') { renderBubbleTab(body); return; }
+    if (tab === 'ambi') { renderAmbiTab(body); return; }
+    if (typeof _origV117Tab === 'function') _origV117Tab(tab);
+  };
+
+  window.v118BuyBubble = function (id) {
+    var st = BUBBLE_STYLES.find(function (x) { return x.id === id; });
+    if (!st) return;
+    var unlocked = loadUnlocked(BUBBLE_KEY, ['default']);
+    if (unlocked.indexOf(id) >= 0) { alert('이미 보유 중입니다.'); return; }
+    if (getPyro() < st.cost) {
+      var msg = document.getElementById('v117-msg');
+      if (msg) { msg.style.color = '#f87171'; msg.textContent = '크리스터탤리오스가 부족합니다. (필요: ' + st.cost + ')'; }
+      return;
+    }
+    addPyro(-st.cost);
+    unlocked.push(id);
+    saveUnlocked(BUBBLE_KEY, unlocked);
+    setActiveBubble(id);
+    var msg2 = document.getElementById('v117-msg');
+    if (msg2) { msg2.style.color = 'var(--accent-color)'; msg2.textContent = st.name + ' 구매 및 적용 완료!'; }
+    renderBubbleTab(document.getElementById('v117-body'));
+  };
+  window.v118ApplyBubble = function (id) {
+    setActiveBubble(id);
+    var msg = document.getElementById('v117-msg');
+    if (msg) { msg.style.color = 'var(--accent-color)'; msg.textContent = '말풍선 스타일이 적용되었습니다.'; }
+    renderBubbleTab(document.getElementById('v117-body'));
+  };
+
+  window.v118BuyAmbi = function (id) {
+    var st = AMBI_ITEMS.find(function (x) { return x.id === id; });
+    if (!st) return;
+    var unlocked = loadUnlocked(AMBI_KEY, ['default']);
+    if (unlocked.indexOf(id) >= 0) { alert('이미 보유 중입니다.'); return; }
+    if (getPyro() < st.cost) {
+      var msg = document.getElementById('v117-msg');
+      if (msg) { msg.style.color = '#f87171'; msg.textContent = '크리스터탤리오스가 부족합니다. (필요: ' + st.cost + ')'; }
+      return;
+    }
+    addPyro(-st.cost);
+    unlocked.push(id);
+    saveUnlocked(AMBI_KEY, unlocked);
+    setActiveAmbi(id);
+    var msg2 = document.getElementById('v117-msg');
+    if (msg2) { msg2.style.color = 'var(--accent-color)'; msg2.textContent = st.name + ' 구매 및 적용 완료!'; }
+    renderAmbiTab(document.getElementById('v117-body'));
+  };
+  window.v118ApplyAmbi = function (id) {
+    setActiveAmbi(id);
+    var msg = document.getElementById('v117-msg');
+    if (msg) { msg.style.color = 'var(--accent-color)'; msg.textContent = '분위기 아이템이 적용되었습니다.'; }
+    renderAmbiTab(document.getElementById('v117-body'));
+  };
+
+  var _origOpen = window.openCrysteraliosShop;
+  window.openCrysteraliosShop = function () {
+    if (typeof _origOpen === 'function') _origOpen();
+    setTimeout(function () {
+      patchShopModal();
+      var bal = document.getElementById('v117-bal');
+      if (bal) {
+        var icon = '';
+        try {
+          var img = bal.querySelector('img');
+          if (img) icon = img.outerHTML + ' ';
+        } catch (e) {}
+        bal.innerHTML = icon + '크리스터탤리오스 <strong>' + getPyro() + '</strong>';
+      }
+    }, 30);
+  };
+
+  function boot() {
+    ensureV118CSS();
+    applyBubbleStyle(getActiveBubble());
+    applyAmbiItem(getActiveAmbi());
+    setTimeout(patchShopModal, 600);
+    setTimeout(patchShopModal, 2000);
+    console.log('[PRANA] v11.8 Bubble + Ambiance shop ready');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+<!-- ========== v11.8 끝 ========== -->
+
+
 </html>
