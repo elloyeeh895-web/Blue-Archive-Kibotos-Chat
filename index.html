@@ -17754,6 +17754,28 @@ body.v97-season-on.v75-ambiance-on .v75-ambiance-layer { opacity:1 !important; }
     if (!ok) { finish(false, '배열이 틀렸습니다.'); return; }
     setText('v105-hack-guide', '접속 성공! 다음 배열을 생성하는 중…'); newRound();
   };
+  // v12.0 bridge: 해킹 패스카드용 시퀀스 노출 · 강제 성공
+  window.__v120HackBridgeSuccess = function () {
+    if (!game.active) return false;
+    game.input = game.sequence.slice();
+    setText('v105-hack-progress', game.input.length + '/' + game.sequence.length);
+    renderSequence(true);
+    var nodes = document.querySelectorAll('#v105-hack-seq .v105-hack-digit');
+    for (var i = 0; i < nodes.length; i++) { nodes[i].classList.add('on'); }
+    var execBtn = document.getElementById('v105-hack-execute');
+    if (execBtn) execBtn.disabled = false;
+    setText('v105-hack-guide', '해킹 패스카드 사용! 접속 성공…');
+    newRound();
+    return true;
+  };
+  window.__v120HackGetSequence = function () {
+    return game.active ? game.sequence.slice() : [];
+  };
+  window.__v120HackCanPass = function () {
+    if (!game.active) return false;
+    var z = document.getElementById('v105-hack-zero');
+    return !!(z && !z.disabled);
+  };
   window.v105OpenHack = function () { try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {} ensureModal(); document.getElementById('v105-hack-modal').style.display = 'flex'; start(); };
   window.v105CloseHack = function () { if (game.active && !confirm('진행 중인 기록을 포기하고 닫을까요?')) return; game.active = false; if (game.timer) clearInterval(game.timer); if (game.revealTimer) clearTimeout(game.revealTimer); var m = document.getElementById('v105-hack-modal'); if (m) m.style.display = 'none'; };
   window.v105OpenHackRanking = function () {
@@ -25934,6 +25956,978 @@ body.v118-logo-cyan #schale-logo-overlay {
 })();
 </script>
 <!-- ========== v11.8 끝 ========== -->
+
+
+
+<!-- ========== v11.9 시작: 커스텀 학생 고도화 ========== -->
+<style id="v119-custom-css">
+#v119-manage-modal,#v119-edit-modal{display:none;position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.78);align-items:center;justify-content:center;padding:16px;box-sizing:border-box;}
+#v119-manage-modal.open,#v119-edit-modal.open{display:flex!important;}
+.v119-box{background:var(--card-bg,#151a24);border:1px solid var(--border-color,#2a3447);border-radius:14px;padding:16px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;color:var(--text-color,#e0e6ed);box-sizing:border-box;-webkit-overflow-scrolling:touch;}
+.v119-box h3{margin:0 0 8px;font-size:16px;text-align:center;}
+.v119-hint{font-size:11px;color:#8a9bb0;text-align:center;margin-bottom:12px;line-height:1.45;}
+.v119-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;max-height:50vh;overflow-y:auto;}
+.v119-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--bg-color,#0b0e14);border:1px solid var(--border-color);flex-wrap:wrap;}
+.v119-item .badge{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:14px;flex-shrink:0;border:2px solid var(--accent-color,#8a2be2);}
+.v119-item .info{flex:1;min-width:0;}
+.v119-item .info .nm{font-size:14px;font-weight:700;}
+.v119-item .info .ds{font-size:11px;color:#8a9bb0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.v119-item .acts{display:flex;gap:4px;flex-wrap:wrap;}
+.v119-item .acts button{padding:5px 8px;border-radius:6px;border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);font-size:11px;font-weight:700;cursor:pointer;}
+.v119-item .acts button:active{border-color:var(--accent-color);transform:scale(.96);}
+.v119-item .acts button.danger{color:#fca5a5;border-color:#ef4444;background:rgba(239,68,68,.12);}
+.v119-field{margin-bottom:10px;}
+.v119-field label{font-size:12px;color:#8a9bb0;font-weight:700;display:block;margin-bottom:4px;}
+.v119-field input,.v119-field textarea,.v119-field select{width:100%;padding:10px;background:var(--bg-color);border:1px solid var(--border-color);color:var(--text-color);border-radius:6px;font-size:14px;outline:none;box-sizing:border-box;}
+.v119-field textarea{min-height:72px;resize:vertical;line-height:1.45;}
+.v119-field input:focus,.v119-field textarea:focus,.v119-field select:focus{border-color:var(--accent-color);}
+.v119-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.v119-chip{padding:6px 10px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid var(--border-color);background:var(--bg-color);color:var(--text-color);cursor:pointer;}
+.v119-chip.on{border-color:var(--accent-color);background:var(--accent-color);color:#fff;}
+.v119-color-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;}
+.v119-color-dot{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;box-shadow:0 0 0 1px var(--border-color);}
+.v119-color-dot.on{border-color:#fff;box-shadow:0 0 0 2px var(--accent-color);}
+.v119-preview{padding:12px;border-radius:10px;background:var(--bg-color);border:1px solid var(--border-color);margin-bottom:12px;display:flex;align-items:center;gap:12px;}
+.v119-preview .pv-av{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:18px;border:2px solid #b19ffb;flex-shrink:0;}
+.v119-preview .pv-txt .nm{font-weight:700;font-size:14px;}
+.v119-preview .pv-txt .sub{font-size:11px;color:#8a9bb0;}
+.v119-btn-row{display:flex;gap:8px;margin-top:8px;}
+.v119-btn-row button{flex:1;padding:11px;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;}
+.v119-btn-primary{background:var(--accent-color,#8a2be2);color:#fff;}
+.v119-btn-gray{background:#334155;color:#fff;}
+.v119-empty{text-align:center;color:#8a9bb0;font-size:13px;padding:24px 8px;}
+.v119-section{font-size:12px;font-weight:800;color:var(--accent-color);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border-color);}
+</style>
+<script>
+(function () {
+  'use strict';
+  if (window.__PRANA_V119__) return;
+  window.__PRANA_V119__ = true;
+
+  var CUSTOM_PASS = '12m1239';
+  var ACCENT_PRESETS = [
+    { id: 'violet', name: '보라', accent: '#8a2be2', a0: '#4b0082', a1: '#8a2be2', border: '#b19ffb' },
+    { id: 'blue', name: '블루', accent: '#3b82f6', a0: '#1d4ed8', a1: '#60a5fa', border: '#93c5fd' },
+    { id: 'pink', name: '핑크', accent: '#ec4899', a0: '#be185d', a1: '#f472b6', border: '#f9a8d4' },
+    { id: 'cyan', name: '시안', accent: '#06b6d4', a0: '#0e7490', a1: '#22d3ee', border: '#67e8f9' },
+    { id: 'green', name: '그린', accent: '#22c55e', a0: '#15803d', a1: '#4ade80', border: '#86efac' },
+    { id: 'amber', name: '앰버', accent: '#f59e0b', a0: '#b45309', a1: '#fbbf24', border: '#fcd34d' },
+    { id: 'red', name: '레드', accent: '#ef4444', a0: '#b91c1c', a1: '#f87171', border: '#fca5a5' },
+    { id: 'slate', name: '슬레이트', accent: '#64748b', a0: '#334155', a1: '#94a3b8', border: '#cbd5e1' }
+  ];
+
+  var THEME_BASES = {
+    dark: { bg: '#0b0e14', card: '#151a24', text: '#e0e6ed', headerText: '#e0e6ed', botBubble: '#1f2636', botText: '#e2e8f0', userBubble: '#3a2e56', userText: '#ffffff', border: '#2a3447' },
+    light: { bg: '#f8fafc', card: '#ffffff', text: '#0f172a', headerText: '#0f172a', botBubble: '#f1f5f9', botText: '#0f172a', userBubble: '#2563eb', userText: '#ffffff', border: '#e2e8f0' },
+    momotalk: { bg: '#fff0f5', card: '#ff78a5', text: '#1e293b', headerText: '#ffffff', botBubble: '#ffffff', botText: '#1e293b', userBubble: '#38bdf8', userText: '#ffffff', border: '#fbcfe8' }
+  };
+
+  var PROMPT_TEMPLATES = [
+    { id: 'blank', name: '직접 작성', text: '' },
+    { id: 'bright', name: '밝고 활발', text: '밝고 활발하며 텐션이 높습니다. 선생님을 좋아하고 자주 응원합니다. "~해요!", "헤헤", "우와!" 같은 표현을 씁니다. 2~3문장으로 답합니다.' },
+    { id: 'cool', name: '쿨·담담', text: '말수가 적고 담담합니다. 감정 표현을 절제하지만 선생님을 신경 씁니다. 짧고 간결한 존댓말로 2문장 내외로 답합니다.' },
+    { id: 'tsundere', name: '츤데레', text: '겉으로는 무뚝뚝하고 부정하지만 속으로는 선생님을 신경 씁니다. "별 수 없잖아…", "딱히 네가 좋아서 그런 건 아니야!" 같은 말투. 반말·존댓말 섞어 2~3문장.' },
+    { id: 'soft', name: '다정·온화', text: '부드럽고 다정합니다. 선생님의 기분을 살피고 위로합니다. 차분한 존댓말(~해요, ~이에요)로 2~3문장.' },
+    { id: 'serious', name: '진지·성실', text: '성실하고 책임감 있습니다. 상황을 정리해 주고 실용적인 조언을 합니다. 정중한 존댓말로 2~4문장.' },
+    { id: 'playful', name: '장난·티키타카', text: '장난기가 많고 선생님을 놀리거나 티키타카를 즐깁니다. 가벼운 말투, 이모지 느낌의 감탄을 섞어 2~3문장.' },
+    { id: 'shy', name: '수줍은', text: '수줍고 말끝을 흐리는 편입니다. "그, 그게…", "…죄송해요" 같은 표현. 존댓말로 짧게 답합니다.' }
+  ];
+
+  var SPEECH_STYLES = [
+    { id: 'jonda', name: '존댓말', extra: '말투는 항상 정중한 존댓말(~요, ~습니다)을 사용하세요.' },
+    { id: 'banmal', name: '반말', extra: '말투는 친근한 반말(~야, ~어, ~지)을 사용하세요. 선생님은 "선생" 또는 "선생님"으로 부릅니다.' },
+    { id: 'aegyo', name: '애교', extra: '말투에 애교를 살짝 넣으세요(~예요~, ~할래요?). 과하지 않게 2~3문장.' },
+    { id: 'formal', name: '딱딱·공식', extra: '공식적이고 간결한 보고체 말투를 사용하세요. 불필요한 감탄사는 줄이세요.' }
+  ];
+
+  var editState = { id: null };
+
+  function sg(k) {
+    try { return localStorage.getItem(k) || ''; } catch (e) {
+      return (typeof safeGet === 'function') ? (safeGet(k) || '') : '';
+    }
+  }
+  function ss(k, v) {
+    try { localStorage.setItem(k, String(v)); } catch (e) {
+      if (typeof safeSet === 'function') safeSet(k, String(v));
+    }
+  }
+
+  function getCustoms() {
+    try {
+      if (typeof loadCustomPersonas === 'function') {
+        var m = loadCustomPersonas();
+        if (m && typeof m === 'object') return m;
+      }
+    } catch (e) {}
+    try {
+      var raw = sg('PRANA_CUSTOM_PERSONAS');
+      return raw ? JSON.parse(raw) : {};
+    } catch (e2) { return {}; }
+  }
+
+  function saveCustoms(map) {
+    ss('PRANA_CUSTOM_PERSONAS', JSON.stringify(map));
+    try {
+      if (typeof customPersonas !== 'undefined') {
+        Object.keys(customPersonas).forEach(function (k) { delete customPersonas[k]; });
+        Object.keys(map).forEach(function (k) { customPersonas[k] = map[k]; });
+      }
+    } catch (e) {}
+    try {
+      if (typeof PERSONAS !== 'undefined') {
+        Object.keys(PERSONAS).forEach(function (k) {
+          if (PERSONAS[k] && PERSONAS[k].isCustom) delete PERSONAS[k];
+        });
+        Object.keys(map).forEach(function (k) { PERSONAS[k] = map[k]; });
+        try { window.PERSONAS = PERSONAS; } catch (e2) {}
+      } else if (window.PERSONAS) {
+        Object.keys(window.PERSONAS).forEach(function (k) {
+          if (window.PERSONAS[k] && window.PERSONAS[k].isCustom) delete window.PERSONAS[k];
+        });
+        Object.keys(map).forEach(function (k) { window.PERSONAS[k] = map[k]; });
+      }
+    } catch (e3) {}
+  }
+
+  function buildTheme(baseId, accentId) {
+    var base = THEME_BASES[baseId] || THEME_BASES.dark;
+    var acc = ACCENT_PRESETS.find(function (a) { return a.id === accentId; }) || ACCENT_PRESETS[0];
+    var t = {};
+    Object.keys(base).forEach(function (k) { t[k] = base[k]; });
+    t.accent = acc.accent;
+    t.avatarBg = 'linear-gradient(135deg, ' + acc.a0 + ', ' + acc.a1 + ')';
+    t.avatarBorder = acc.border;
+    if (baseId === 'dark') t.userBubble = acc.a0;
+    return t;
+  }
+
+  function ensureModals() {
+    if (document.getElementById('v119-manage-modal')) return;
+
+    var manage = document.createElement('div');
+    manage.id = 'v119-manage-modal';
+    manage.innerHTML =
+      '<div class="v119-box">' +
+      '<h3>⭐ 커스텀 학생 관리</h3>' +
+      '<p class="v119-hint">편집 · 복제 · 삭제 · 바로 대화. 기존 추가/공유 기능과 호환됩니다.</p>' +
+      '<div class="v119-list" id="v119-list"></div>' +
+      '<div class="v119-btn-row">' +
+      '<button type="button" class="v119-btn-primary" onclick="window.v119OpenCreate()">➕ 새로 만들기</button>' +
+      '<button type="button" class="v119-btn-gray" onclick="window.closeV119Manage()">닫기</button>' +
+      '</div></div>';
+    manage.addEventListener('click', function (ev) { if (ev.target === manage) window.closeV119Manage(); });
+    document.body.appendChild(manage);
+
+    var edit = document.createElement('div');
+    edit.id = 'v119-edit-modal';
+    edit.innerHTML =
+      '<div class="v119-box">' +
+      '<h3 id="v119-edit-title">커스텀 학생</h3>' +
+      '<p class="v119-hint">이름·프롬프트는 필수입니다. 테마와 말투 템플릿을 고를 수 있어요.</p>' +
+      '<div class="v119-preview" id="v119-preview">' +
+      '<div class="pv-av" id="v119-pv-av">⭐</div>' +
+      '<div class="pv-txt"><div class="nm" id="v119-pv-name">이름</div><div class="sub" id="v119-pv-sub">소속</div></div>' +
+      '</div>' +
+      '<div class="v119-section">기본 정보</div>' +
+      '<div class="v119-field"><label>학생 이름 *</label><input type="text" id="v119-name" placeholder="예: 카오리" maxlength="24"></div>' +
+      '<div class="v119-field"><label>표시 타이틀</label><input type="text" id="v119-title" placeholder="예: 카오리 (Kaori)" maxlength="40"></div>' +
+      '<div class="v119-field"><label>소속 / 상태</label><input type="text" id="v119-sub" placeholder="예: 트리니티 • 자경단" maxlength="48"></div>' +
+      '<div class="v119-field"><label>아이콘 (이모지 또는 한 글자)</label><input type="text" id="v119-avatar" placeholder="🌸" maxlength="4"></div>' +
+      '<div class="v119-field"><label>첫 인사말</label><input type="text" id="v119-greeting" placeholder="선생님, 안녕하세요!" maxlength="200"></div>' +
+      '<div class="v119-section">테마 · 아바타 색</div>' +
+      '<div class="v119-field"><label>테마 베이스</label>' +
+      '<div class="v119-chips" id="v119-theme-chips">' +
+      '<button type="button" class="v119-chip on" data-base="dark">다크</button>' +
+      '<button type="button" class="v119-chip" data-base="light">라이트</button>' +
+      '<button type="button" class="v119-chip" data-base="momotalk">모모톡</button>' +
+      '</div></div>' +
+      '<div class="v119-field"><label>액센트 색</label><div class="v119-color-row" id="v119-color-row"></div></div>' +
+      '<div class="v119-section">성격 · 말투</div>' +
+      '<div class="v119-field"><label>프롬프트 템플릿</label><div class="v119-chips" id="v119-tpl-chips"></div></div>' +
+      '<div class="v119-field"><label>말투 스타일</label><div class="v119-chips" id="v119-speech-chips"></div></div>' +
+      '<div class="v119-field"><label>AI 캐릭터 설정 / 프롬프트 *</label>' +
+      '<textarea id="v119-prompt" rows="5" placeholder="성격, 말투, 행동 특징을 적어 주세요."></textarea></div>' +
+      '<div class="v119-field"><label>메모 (본인만 보는 메모, 선택)</label>' +
+      '<input type="text" id="v119-note" placeholder="예: 2기 오리지널 설정" maxlength="80"></div>' +
+      '<div class="v119-section">이미지 (선택)</div>' +
+      '<div class="v119-field"><label>기본 이미지 URL</label><input type="url" id="v119-image" placeholder="https://..."></div>' +
+      '<div class="v119-field"><label>기쁨 / 슬픔 / 놀람 표정 URL</label>' +
+      '<input type="url" id="v119-expr-happy" placeholder="기쁨 https://..." style="margin-bottom:6px;">' +
+      '<input type="url" id="v119-expr-sad" placeholder="슬픔 https://..." style="margin-bottom:6px;">' +
+      '<input type="url" id="v119-expr-surprised" placeholder="놀람 https://..."></div>' +
+      '<div class="v119-field" id="v119-pass-wrap"><label>생성 패스워드</label>' +
+      '<input type="password" id="v119-pass" placeholder="패스워드 입력"></div>' +
+      '<p id="v119-msg" style="font-size:12px;text-align:center;min-height:18px;color:var(--accent-color);margin:8px 0;"></p>' +
+      '<div class="v119-btn-row">' +
+      '<button type="button" class="v119-btn-primary" id="v119-save-btn" onclick="window.v119Save()">저장</button>' +
+      '<button type="button" class="v119-btn-gray" onclick="window.closeV119Edit()">취소</button>' +
+      '</div></div>';
+    edit.addEventListener('click', function (ev) { if (ev.target === edit) window.closeV119Edit(); });
+    document.body.appendChild(edit);
+
+    var row = document.getElementById('v119-color-row');
+    ACCENT_PRESETS.forEach(function (a, i) {
+      var d = document.createElement('button');
+      d.type = 'button';
+      d.className = 'v119-color-dot' + (i === 0 ? ' on' : '');
+      d.style.background = 'linear-gradient(135deg,' + a.a0 + ',' + a.a1 + ')';
+      d.title = a.name;
+      d.setAttribute('data-accent', a.id);
+      d.onclick = function () {
+        row.querySelectorAll('.v119-color-dot').forEach(function (x) { x.classList.remove('on'); });
+        d.classList.add('on');
+        updatePreview();
+      };
+      row.appendChild(d);
+    });
+
+    var tplBox = document.getElementById('v119-tpl-chips');
+    PROMPT_TEMPLATES.forEach(function (t) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'v119-chip' + (t.id === 'blank' ? ' on' : '');
+      b.textContent = t.name;
+      b.setAttribute('data-tpl', t.id);
+      b.onclick = function () {
+        tplBox.querySelectorAll('.v119-chip').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        if (t.text) {
+          var ta = document.getElementById('v119-prompt');
+          if (ta && (!ta.value.trim() || confirm('템플릿으로 프롬프트를 덮어쓸까요?'))) {
+            ta.value = t.text;
+          }
+        }
+      };
+      tplBox.appendChild(b);
+    });
+
+    var spBox = document.getElementById('v119-speech-chips');
+    SPEECH_STYLES.forEach(function (s, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'v119-chip' + (i === 0 ? ' on' : '');
+      b.textContent = s.name;
+      b.setAttribute('data-speech', s.id);
+      b.onclick = function () {
+        spBox.querySelectorAll('.v119-chip').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+      };
+      spBox.appendChild(b);
+    });
+
+    document.getElementById('v119-theme-chips').addEventListener('click', function (ev) {
+      var t = ev.target.closest('[data-base]');
+      if (!t) return;
+      document.querySelectorAll('#v119-theme-chips .v119-chip').forEach(function (x) { x.classList.remove('on'); });
+      t.classList.add('on');
+      updatePreview();
+    });
+
+    ['v119-name', 'v119-sub', 'v119-avatar'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('input', updatePreview);
+    });
+  }
+
+  function selectedBase() {
+    var on = document.querySelector('#v119-theme-chips .v119-chip.on');
+    return (on && on.getAttribute('data-base')) || 'dark';
+  }
+  function selectedAccent() {
+    var on = document.querySelector('#v119-color-row .v119-color-dot.on');
+    return (on && on.getAttribute('data-accent')) || 'violet';
+  }
+  function selectedSpeech() {
+    var on = document.querySelector('#v119-speech-chips .v119-chip.on');
+    return (on && on.getAttribute('data-speech')) || 'jonda';
+  }
+
+  function updatePreview() {
+    var name = (document.getElementById('v119-name').value || '이름').trim() || '이름';
+    var sub = (document.getElementById('v119-sub').value || '커스텀 학생').trim() || '커스텀 학생';
+    var av = (document.getElementById('v119-avatar').value || '⭐').trim() || '⭐';
+    var theme = buildTheme(selectedBase(), selectedAccent());
+    var pvAv = document.getElementById('v119-pv-av');
+    var pvName = document.getElementById('v119-pv-name');
+    var pvSub = document.getElementById('v119-pv-sub');
+    if (pvAv) {
+      pvAv.textContent = av.slice(0, 2);
+      pvAv.style.background = theme.avatarBg;
+      pvAv.style.borderColor = theme.avatarBorder;
+    }
+    if (pvName) pvName.textContent = name;
+    if (pvSub) pvSub.textContent = sub;
+  }
+
+  function setMsg(text, ok) {
+    var el = document.getElementById('v119-msg');
+    if (!el) return;
+    el.textContent = text || '';
+    el.style.color = ok === false ? '#f87171' : 'var(--accent-color)';
+  }
+
+  function fillForm(persona) {
+    document.getElementById('v119-name').value = persona.name || '';
+    document.getElementById('v119-title').value = persona.title || '';
+    document.getElementById('v119-sub').value = persona.sub || '';
+    document.getElementById('v119-avatar').value = persona.avatar || '⭐';
+    document.getElementById('v119-greeting').value = persona.greeting || '';
+    document.getElementById('v119-note').value = persona.note || '';
+    document.getElementById('v119-image').value = persona.image || '';
+    var ex = persona.expressions || {};
+    document.getElementById('v119-expr-happy').value = ex.happy || '';
+    document.getElementById('v119-expr-sad').value = ex.sad || '';
+    document.getElementById('v119-expr-surprised').value = ex.surprised || '';
+
+    var pr = persona.prompt || '';
+    var m = pr.match(/^당신은 '블루 아카이브'의 커스텀 학생 '[^']+'입니다\.\s*/);
+    if (m) pr = pr.slice(m[0].length);
+    SPEECH_STYLES.forEach(function (s) {
+      if (pr.indexOf(s.extra) >= 0) pr = pr.replace(s.extra, '').trim();
+    });
+    document.getElementById('v119-prompt').value = pr;
+
+    var base = (persona.v119 && persona.v119.base) || 'dark';
+    var accent = (persona.v119 && persona.v119.accent) || 'violet';
+    var speech = (persona.v119 && persona.v119.speech) || 'jonda';
+
+    document.querySelectorAll('#v119-theme-chips .v119-chip').forEach(function (c) {
+      c.classList.toggle('on', c.getAttribute('data-base') === base);
+    });
+    document.querySelectorAll('#v119-color-row .v119-color-dot').forEach(function (c) {
+      c.classList.toggle('on', c.getAttribute('data-accent') === accent);
+    });
+    document.querySelectorAll('#v119-speech-chips .v119-chip').forEach(function (c) {
+      c.classList.toggle('on', c.getAttribute('data-speech') === speech);
+    });
+    document.querySelectorAll('#v119-tpl-chips .v119-chip').forEach(function (c) {
+      c.classList.toggle('on', c.getAttribute('data-tpl') === 'blank');
+    });
+
+    updatePreview();
+  }
+
+  function clearForm() {
+    fillForm({
+      name: '', title: '', sub: '', avatar: '⭐', greeting: '', prompt: '', note: '',
+      image: '', expressions: {}, v119: { base: 'dark', accent: 'violet', speech: 'jonda' }
+    });
+    document.getElementById('v119-pass').value = '';
+    setMsg('');
+  }
+
+  window.closeV119Manage = function () {
+    var m = document.getElementById('v119-manage-modal');
+    if (m) { m.classList.remove('open'); m.style.display = 'none'; }
+  };
+  window.closeV119Edit = function () {
+    var m = document.getElementById('v119-edit-modal');
+    if (m) { m.classList.remove('open'); m.style.display = 'none'; }
+    editState.id = null;
+  };
+
+  window.openV119Manage = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    ensureModals();
+    renderList();
+    var m = document.getElementById('v119-manage-modal');
+    if (m) { m.classList.add('open'); m.style.display = 'flex'; }
+  };
+
+  window.v119OpenCreate = function () {
+    ensureModals();
+    editState.id = null;
+    document.getElementById('v119-edit-title').textContent = '커스텀 학생 만들기';
+    document.getElementById('v119-pass-wrap').style.display = '';
+    document.getElementById('v119-save-btn').textContent = '추가하기';
+    clearForm();
+    window.closeV119Manage();
+    var m = document.getElementById('v119-edit-modal');
+    if (m) { m.classList.add('open'); m.style.display = 'flex'; }
+  };
+
+  window.v119OpenEdit = function (id) {
+    ensureModals();
+    var map = getCustoms();
+    var p = map[id];
+    if (!p) { alert('학생을 찾을 수 없습니다.'); return; }
+    editState.id = id;
+    document.getElementById('v119-edit-title').textContent = '커스텀 학생 편집';
+    document.getElementById('v119-pass-wrap').style.display = 'none';
+    document.getElementById('v119-save-btn').textContent = '저장하기';
+    fillForm(p);
+    setMsg('');
+    window.closeV119Manage();
+    var m = document.getElementById('v119-edit-modal');
+    if (m) { m.classList.add('open'); m.style.display = 'flex'; }
+  };
+
+  window.v119Duplicate = function (id) {
+    var map = getCustoms();
+    var p = map[id];
+    if (!p) return;
+    if (!confirm('"' + p.name + '" 학생을 복제할까요?')) return;
+    var newId = 'custom_' + Date.now();
+    var copy = JSON.parse(JSON.stringify(p));
+    copy.id = newId;
+    copy.name = (p.name || '학생') + ' (복사)';
+    copy.title = (p.title || p.name || '') + ' (복사)';
+    copy.isCustom = true;
+    map[newId] = copy;
+    saveCustoms(map);
+    renderList();
+    alert('복제되었습니다: ' + copy.name);
+  };
+
+  window.v119Delete = function (id) {
+    var map = getCustoms();
+    var p = map[id];
+    if (!p) return;
+    if (!confirm('"' + p.name + '" 학생을 삭제할까요?\n대화 기록도 함께 삭제됩니다.')) return;
+    delete map[id];
+    saveCustoms(map);
+    try { ss('PRANA_CHAT_' + id, ''); } catch (e) {}
+    try {
+      if (typeof bondRanks !== 'undefined') {
+        delete bondRanks[id];
+        if (typeof saveBondRanks === 'function') saveBondRanks();
+      }
+    } catch (e2) {}
+    try {
+      var mode = (typeof currentMode !== 'undefined') ? currentMode : sg('PRANA_MODE');
+      if (mode === id) {
+        if (typeof switchMode === 'function') switchMode('prana');
+        else { ss('PRANA_MODE', 'prana'); }
+      }
+    } catch (e3) {}
+    renderList();
+    try {
+      if (typeof renderCharList === 'function') renderCharList((document.getElementById('char-search-input') || {}).value || '');
+    } catch (e4) {}
+  };
+
+  window.v119Chat = function (id) {
+    window.closeV119Manage();
+    try {
+      if (typeof switchMode === 'function') switchMode(id);
+      else {
+        ss('PRANA_MODE', id);
+        if (typeof initChat === 'function') initChat();
+      }
+    } catch (e) {
+      alert('대화 전환에 실패했습니다. 메뉴에서 대화 상대를 다시 선택해 주세요.');
+    }
+  };
+
+  function renderList() {
+    ensureModals();
+    var list = document.getElementById('v119-list');
+    if (!list) return;
+    var map = getCustoms();
+    var keys = Object.keys(map);
+    if (keys.length === 0) {
+      list.innerHTML = '<div class="v119-empty">등록된 커스텀 학생이 없습니다.<br>아래 [새로 만들기]로 추가해 보세요.</div>';
+      return;
+    }
+    list.innerHTML = keys.map(function (k) {
+      var p = map[k];
+      var bg = (p.theme && p.theme.avatarBg) || 'linear-gradient(135deg,#4b0082,#8a2be2)';
+      var border = (p.theme && p.theme.avatarBorder) || '#b19ffb';
+      var note = p.note ? '<div class="ds" style="color:#a78bfa;">📝 ' + escapeHtml(p.note) + '</div>' : '';
+      return '<div class="v119-item">' +
+        '<div class="badge" style="background:' + bg + ';border-color:' + border + ';">' + escapeHtml((p.avatar || '⭐').slice(0, 2)) + '</div>' +
+        '<div class="info"><div class="nm">' + escapeHtml(p.name || k) + '</div>' +
+        '<div class="ds">' + escapeHtml(p.sub || '') + '</div>' + note + '</div>' +
+        '<div class="acts">' +
+        '<button type="button" onclick="window.v119Chat(\'' + k + '\')">대화</button>' +
+        '<button type="button" onclick="window.v119OpenEdit(\'' + k + '\')">편집</button>' +
+        '<button type="button" onclick="window.v119Duplicate(\'' + k + '\')">복제</button>' +
+        '<button type="button" class="danger" onclick="window.v119Delete(\'' + k + '\')">삭제</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  window.v119Save = function () {
+    var isEdit = !!editState.id;
+    var name = (document.getElementById('v119-name').value || '').trim();
+    var title = (document.getElementById('v119-title').value || '').trim() || name;
+    var sub = (document.getElementById('v119-sub').value || '').trim() || '커스텀 학생 • 온라인';
+    var avatar = (document.getElementById('v119-avatar').value || '').trim() || '⭐';
+    var greeting = (document.getElementById('v119-greeting').value || '').trim();
+    var promptBody = (document.getElementById('v119-prompt').value || '').trim();
+    var note = (document.getElementById('v119-note').value || '').trim();
+    var image = (document.getElementById('v119-image').value || '').trim();
+    var expressions = {
+      happy: (document.getElementById('v119-expr-happy').value || '').trim(),
+      sad: (document.getElementById('v119-expr-sad').value || '').trim(),
+      surprised: (document.getElementById('v119-expr-surprised').value || '').trim()
+    };
+
+    if (!name || !promptBody) {
+      setMsg('이름과 AI 프롬프트는 필수입니다.', false);
+      return;
+    }
+
+    if (!isEdit) {
+      var pass = (document.getElementById('v119-pass').value || '').trim();
+      if (pass !== CUSTOM_PASS) {
+        setMsg('패스워드가 일치하지 않습니다.', false);
+        return;
+      }
+    }
+
+    var base = selectedBase();
+    var accent = selectedAccent();
+    var speechId = selectedSpeech();
+    var speech = SPEECH_STYLES.find(function (s) { return s.id === speechId; }) || SPEECH_STYLES[0];
+    var theme = buildTheme(base, accent);
+
+    if (!greeting) {
+      try {
+        var un = (typeof userName !== 'undefined' && userName) ? userName : '선생님';
+        greeting = '안녕하세요, ' + un + '!';
+      } catch (e) {
+        greeting = '안녕하세요, 선생님!';
+      }
+    }
+
+    var fullPrompt = "당신은 '블루 아카이브'의 커스텀 학생 '" + name + "'입니다. " + promptBody + ' ' + speech.extra;
+
+    var map = getCustoms();
+    var id = isEdit ? editState.id : ('custom_' + Date.now());
+    var prev = isEdit ? (map[id] || {}) : {};
+
+    var newPersona = {
+      id: id,
+      name: name,
+      title: title,
+      sub: sub,
+      avatar: avatar,
+      greeting: greeting,
+      image: image,
+      expressions: expressions,
+      isCustom: true,
+      theme: theme,
+      prompt: fullPrompt,
+      note: note,
+      v119: { base: base, accent: accent, speech: speechId, version: 1 }
+    };
+    if (prev.hidden) newPersona.hidden = prev.hidden;
+
+    map[id] = newPersona;
+    saveCustoms(map);
+
+    setMsg(isEdit ? '저장되었습니다!' : '등록되었습니다!', true);
+
+    try {
+      if (typeof renderCharList === 'function') {
+        renderCharList((document.getElementById('char-search-input') || {}).value || '');
+      }
+    } catch (e) {}
+
+    setTimeout(function () {
+      window.closeV119Edit();
+      if (!isEdit) {
+        try {
+          if (typeof switchMode === 'function') switchMode(id);
+        } catch (e2) {}
+      } else {
+        try {
+          var mode = (typeof currentMode !== 'undefined') ? currentMode : sg('PRANA_MODE');
+          if (mode === id && typeof switchMode === 'function') switchMode(id);
+        } catch (e3) {}
+        window.openV119Manage();
+      }
+    }, 350);
+  };
+
+  function injectMenu() {
+    var list = document.querySelector('#main-menu-modal .menu-list');
+    if (!list || document.getElementById('menu-v119-custom')) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'menu-v119-custom';
+    btn.className = 'menu-item-btn';
+    btn.setAttribute('data-search', '커스텀 관리 편집 복제 custom manage edit');
+    btn.innerHTML = '⭐ 커스텀 학생 관리';
+    btn.onclick = function () { window.openV119Manage(); };
+    var ref = list.querySelector('[onclick*="custom-char"]') || list.querySelector('[data-search*="커스텀 추가"]');
+    if (ref && ref.parentNode) {
+      ref.parentNode.insertBefore(btn, ref);
+    } else {
+      list.insertBefore(btn, list.firstChild);
+    }
+  }
+
+  function patchOriginal() {
+    if (typeof window.openCustomCharModal === 'function' && !window.openCustomCharModal.__v119) {
+      var prev = window.openCustomCharModal;
+      window.openCustomCharModal = function () {
+        window.v119OpenCreate();
+      };
+      window.openCustomCharModal.__v119 = true;
+      window.openCustomCharModal.__prev = prev;
+    }
+  }
+
+  function boot() {
+    ensureModals();
+    injectMenu();
+    patchOriginal();
+    setTimeout(injectMenu, 800);
+    setTimeout(injectMenu, 2500);
+    setTimeout(patchOriginal, 1000);
+    console.log('[PRANA] v11.9 Custom character manager ready');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+<!-- ========== v11.9 끝 ========== -->
+
+<!-- ========== v12.0 시작: 커스텀 코드 카드 · 해킹 패스카드 ========== -->
+<script id="v120-new-items">
+/**
+ * v12.0 신규 아이템
+ * 1) 커스텀 학생 추가 코드 확인 카드 — 크리스터탤리오스 상점 유틸 탭, 생성 패스워드 확인
+ * 2) 해킹 패스카드 (1회용) — 청휘석 50, 해킹 미니게임 정답 자동 입력
+ */
+(function () {
+  'use strict';
+  if (window.__PRANA_V120__) return;
+  window.__PRANA_V120__ = true;
+
+  var CUSTOM_PASS = '12m1239';
+  var CODE_CARD_KEY = 'PRANA_V120_CODE_CARD';
+  var CODE_CARD_COST = 15;
+  var HACK_PASS_KEY = 'PRANA_V120_HACK_PASS';
+  var HACK_PASS_COST = 50;
+
+  function sg(k) {
+    try { return localStorage.getItem(k) || ''; } catch (e) {
+      return (typeof safeGet === 'function') ? (safeGet(k) || '') : '';
+    }
+  }
+  function ss(k, v) {
+    try { localStorage.setItem(k, String(v)); } catch (e) {
+      if (typeof safeSet === 'function') safeSet(k, String(v));
+    }
+  }
+
+  function hasCodeCard() { return sg(CODE_CARD_KEY) === '1'; }
+  function setCodeCardOwned() { ss(CODE_CARD_KEY, '1'); }
+
+  function getHackPass() {
+    return Math.max(0, Math.floor(Number(sg(HACK_PASS_KEY) || 0) || 0));
+  }
+  function setHackPass(n) {
+    ss(HACK_PASS_KEY, String(Math.max(0, Math.floor(n || 0))));
+  }
+  function addHackPass(n) {
+    setHackPass(getHackPass() + Math.floor(n || 0));
+  }
+
+  function getCryst() {
+    try {
+      if (typeof window.getCrysteralios === 'function') return Math.max(0, Math.floor(window.getCrysteralios() || 0));
+    } catch (e) {}
+    return Math.max(0, Math.floor(Number(sg('PRANA_CRYSTERALIOS') || 0) || 0));
+  }
+  function addCryst(n) {
+    try {
+      if (typeof window.addCrysteralios === 'function') { window.addCrysteralios(n); return getCryst(); }
+    } catch (e) {}
+    var next = Math.max(0, getCryst() + Math.floor(n || 0));
+    ss('PRANA_CRYSTERALIOS', String(next));
+    return next;
+  }
+
+  function getPyroBal() {
+    try {
+      if (typeof window.getPyroxene === 'function') return Math.max(0, Math.floor(window.getPyroxene() || 0));
+    } catch (e) {}
+    return Math.max(0, Math.floor(Number(sg('PRANA_PYROXENE') || 0) || 0));
+  }
+  function addPyroBal(n) {
+    try {
+      if (typeof window.addPyroxene === 'function') { window.addPyroxene(n); return; }
+    } catch (e) {}
+    ss('PRANA_PYROXENE', String(Math.max(0, getPyroBal() + Math.floor(n || 0))));
+  }
+
+  function ensureCss() {
+    if (document.getElementById('v120-code-css')) return;
+    var s = document.createElement('style');
+    s.id = 'v120-code-css';
+    s.textContent =
+      '#v120-code-panel{padding:12px;border:1px solid var(--accent-color,#8a2be2);border-radius:10px;background:color-mix(in srgb,var(--accent-color,#8a2be2) 12%,transparent);margin-bottom:10px;}' +
+      '#v120-code-panel .v120-title{font-size:14px;font-weight:800;margin-bottom:4px;}' +
+      '#v120-code-panel .v120-pass{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;font-weight:800;letter-spacing:.08em;color:var(--accent-color,#8a2be2);text-align:center;padding:10px;background:var(--bg-color,#0b0e14);border-radius:8px;border:1px dashed var(--border-color,#2a3447);user-select:all;}' +
+      '#v120-code-panel .v120-hint{font-size:11px;color:#a78bfa;text-align:center;margin-top:6px;}' +
+      '.v120-util-item{padding:12px;border:1px solid var(--border-color,#2a3447);border-radius:10px;background:var(--bg-color,#0b0e14);margin-bottom:8px;}' +
+      '.v120-util-item.active{border-color:var(--accent-color,#8a2be2);background:color-mix(in srgb,var(--accent-color,#8a2be2) 10%,transparent);}' +
+      '.v120-util-item .meta{font-size:11px;color:#8a9bb0;line-height:1.4;margin:4px 0 8px;}' +
+      '.v120-hack-pass-btn{width:100%;margin:8px 0 0;padding:11px;border:0;border-radius:9px;background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;font-weight:900;font-size:13px;cursor:pointer;}' +
+      '.v120-hack-pass-btn:disabled{opacity:.4;cursor:not-allowed;}' +
+      '.v120-hack-pass-btn:active:not(:disabled){transform:scale(.98);}' +
+      '.v120-hack-pass-count{font-size:11px;color:#a78bfa;text-align:center;margin-top:4px;}';
+    document.head.appendChild(s);
+  }
+
+  function patchCrystShop() {
+    ensureCss();
+    var m = document.getElementById('v117-cr-modal');
+    if (!m) return false;
+    var tabs = m.querySelector('.v117-tabs');
+    if (!tabs) return false;
+    if (tabs.querySelector('[data-tab="util"]')) return true;
+    var utilTab = document.createElement('button');
+    utilTab.type = 'button';
+    utilTab.className = 'v117-tab';
+    utilTab.setAttribute('data-tab', 'util');
+    utilTab.textContent = '유틸';
+    utilTab.onclick = function () { window.v117Tab('util'); };
+    tabs.appendChild(utilTab);
+    return true;
+  }
+
+  function renderUtilTab(body) {
+    ensureCss();
+    var owned = hasCodeCard();
+    var bal = getCryst();
+    var html = '<div class="v120-util-item' + (owned ? ' active' : '') + '">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">';
+    html += '<strong>🔑 커스텀 학생 추가 코드 확인 카드</strong>';
+    if (!owned) html += '<span style="color:var(--accent-color);font-weight:700;white-space:nowrap;">' + CODE_CARD_COST + '</span>';
+    else html += '<span style="color:#34d399;font-weight:700;font-size:12px;">보유</span>';
+    html += '</div>';
+    html += '<p class="meta">커스텀 학생 생성 시 필요한 패스워드를 확인합니다. 1회 구매로 영구 해금되며, 언제든 다시 볼 수 있습니다.</p>';
+    if (owned) {
+      html += '<div id="v120-code-panel">';
+      html += '<div class="v120-title">생성 패스워드</div>';
+      html += '<div class="v120-pass">' + CUSTOM_PASS + '</div>';
+      html += '<div class="v120-hint">커스텀 학생 추가 화면의 패스워드란에 입력하세요.</div>';
+      html += '</div>';
+      html += '<button type="button" class="v117-btn gray" disabled>이미 보유 중</button>';
+    } else {
+      html += '<button type="button" class="v117-btn" onclick="window.v120BuyCodeCard()">구매 ' + CODE_CARD_COST + ' (보유 ' + bal + ')</button>';
+    }
+    html += '</div>';
+    html += '<p style="font-size:11px;color:#8a9bb0;line-height:1.45;margin-top:4px;">결제: 크리스터탤리오스</p>';
+    body.innerHTML = html;
+  }
+
+  window.v120BuyCodeCard = function () {
+    if (hasCodeCard()) { alert('이미 보유 중입니다.'); return; }
+    if (getCryst() < CODE_CARD_COST) {
+      var msg = document.getElementById('v117-msg');
+      if (msg) { msg.style.color = '#f87171'; msg.textContent = '크리스터탤리오스가 부족합니다. (필요: ' + CODE_CARD_COST + ')'; }
+      else alert('크리스터탤리오스가 부족합니다. (필요: ' + CODE_CARD_COST + ')');
+      return;
+    }
+    addCryst(-CODE_CARD_COST);
+    setCodeCardOwned();
+    var msg2 = document.getElementById('v117-msg');
+    if (msg2) { msg2.style.color = 'var(--accent-color)'; msg2.textContent = '코드 확인 카드 구매 완료!'; }
+    var bal = document.getElementById('v117-bal');
+    if (bal) {
+      var icon = '';
+      try { var img = bal.querySelector('img'); if (img) icon = img.outerHTML + ' '; } catch (e) {}
+      bal.innerHTML = icon + '크리스터탤리오스 <strong>' + getCryst() + '</strong>';
+    }
+    var body = document.getElementById('v117-body');
+    if (body) renderUtilTab(body);
+  };
+
+  var _origV117Tab = window.v117Tab;
+  window.v117Tab = function (tab) {
+    patchCrystShop();
+    var tabs = document.querySelectorAll('#v117-cr-modal .v117-tab');
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].classList.toggle('on', tabs[i].getAttribute('data-tab') === tab);
+    }
+    var body = document.getElementById('v117-body');
+    var bal = document.getElementById('v117-bal');
+    if (bal) {
+      var icon = '';
+      try { var img = bal.querySelector('img'); if (img) icon = img.outerHTML + ' '; } catch (e) {}
+      bal.innerHTML = icon + '크리스터탤리오스 <strong>' + getCryst() + '</strong>';
+    }
+    if (tab === 'util') {
+      if (body) renderUtilTab(body);
+      return;
+    }
+    if (typeof _origV117Tab === 'function') _origV117Tab(tab);
+  };
+
+  var _origOpenCr = window.openCrysteraliosShop;
+  window.openCrysteraliosShop = function () {
+    if (typeof _origOpenCr === 'function') _origOpenCr();
+    setTimeout(patchCrystShop, 40);
+    setTimeout(patchCrystShop, 400);
+  };
+
+  function injectShopHackPass() {
+    var shop = document.getElementById('shop-modal');
+    if (!shop || document.getElementById('v120-hack-pass-shop')) return;
+    var anchor = null;
+    var ps = shop.querySelectorAll('p');
+    for (var i = 0; i < ps.length; i++) {
+      if ((ps[i].textContent || '').indexOf('미니게임 아이템') >= 0) { anchor = ps[i]; break; }
+    }
+    var block = document.createElement('div');
+    block.id = 'v120-hack-pass-shop';
+    block.style.cssText = 'padding:12px;border:1px solid #67e8f9;border-radius:10px;background:var(--bg-color);margin-bottom:8px;';
+    block.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+      '<strong>🔓 해킹 패스카드 ×1</strong>' +
+      '<span style="color:#67e8f9;font-weight:700;">50 청휘석</span></div>' +
+      '<p style="font-size:11px;color:#8a9bb0;margin-bottom:8px;line-height:1.45;">해킹 미니게임에서 사용 시 정답 배열을 자동 입력·클리어합니다. (1회용)</p>' +
+      '<button type="button" class="main-btn" style="padding:8px;background:#0e7490;" onclick="window.v120BuyHackPass()">청휘석으로 구매</button>';
+
+    if (anchor && anchor.nextElementSibling) {
+      var after = anchor.nextElementSibling;
+      if (after.parentNode) after.parentNode.insertBefore(block, after.nextSibling);
+    } else {
+      var msg = document.getElementById('shop-msg');
+      if (msg && msg.parentNode) msg.parentNode.insertBefore(block, msg);
+    }
+
+    var row = shop.querySelector('#shop-ticket-count');
+    if (row && row.parentNode && !document.getElementById('v120-hack-pass-count-shop')) {
+      var span = document.createElement('span');
+      span.id = 'v120-hack-pass-count-shop';
+      span.style.marginLeft = '6px';
+      span.innerHTML = ' · 🔓 패스 <strong id="v120-hack-pass-display">' + getHackPass() + '</strong>';
+      row.parentNode.appendChild(span);
+    }
+  }
+
+  window.v120BuyHackPass = function () {
+    if (getPyroBal() < HACK_PASS_COST) {
+      var msg = document.getElementById('shop-msg');
+      if (msg) { msg.style.color = '#f87171'; msg.textContent = '청휘석이 부족합니다. (필요: ' + HACK_PASS_COST + ')'; }
+      else alert('청휘석이 부족합니다. (필요: ' + HACK_PASS_COST + ')');
+      return;
+    }
+    addPyroBal(-HACK_PASS_COST);
+    addHackPass(1);
+    var msg2 = document.getElementById('shop-msg');
+    if (msg2) { msg2.style.color = 'var(--accent-color)'; msg2.textContent = '해킹 패스카드 1장 구매 완료! (보유 ' + getHackPass() + '장)'; }
+    refreshHackPassUI();
+    try {
+      if (typeof window.refreshEconomyUI === 'function') window.refreshEconomyUI();
+    } catch (e) {}
+    try {
+      var el = document.getElementById('shop-pyroxene-display');
+      if (el) el.textContent = String(getPyroBal());
+    } catch (e2) {}
+  };
+
+  function refreshHackPassUI() {
+    var n = getHackPass();
+    var d = document.getElementById('v120-hack-pass-display');
+    if (d) d.textContent = String(n);
+    var btn = document.getElementById('v120-hack-pass-use');
+    if (btn) {
+      btn.disabled = n <= 0;
+      btn.textContent = n > 0 ? ('🔓 해킹 패스카드 사용 (보유 ' + n + ')') : '🔓 해킹 패스카드 없음';
+    }
+    var c = document.getElementById('v120-hack-pass-count-label');
+    if (c) c.textContent = '보유 패스카드: ' + n + '장 · 상점(청휘석 50)에서 구매';
+  }
+
+  function injectHackPassButton() {
+    ensureCss();
+    var view = document.getElementById('v105-hack-view');
+    if (!view || document.getElementById('v120-hack-pass-use')) return;
+    var exec = document.getElementById('v105-hack-execute');
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'v120-hack-pass-use';
+    btn.className = 'v120-hack-pass-btn';
+    btn.onclick = function () { window.v120UseHackPass(); };
+    var n = getHackPass();
+    btn.disabled = n <= 0;
+    btn.textContent = n > 0 ? ('🔓 해킹 패스카드 사용 (보유 ' + n + ')') : '🔓 해킹 패스카드 없음';
+    if (exec && exec.parentNode) exec.parentNode.insertBefore(btn, exec.nextSibling);
+    else view.appendChild(btn);
+    var label = document.createElement('div');
+    label.id = 'v120-hack-pass-count-label';
+    label.className = 'v120-hack-pass-count';
+    label.textContent = '보유 패스카드: ' + n + '장 · 상점(청휘석 50)에서 구매';
+    btn.parentNode.insertBefore(label, btn.nextSibling);
+  }
+
+  window.v120UseHackPass = function () {
+    if (getHackPass() <= 0) {
+      alert('해킹 패스카드가 없습니다.\\n샬레 상점 → 미니게임 아이템에서 청휘석 50개로 구매할 수 있습니다.');
+      return;
+    }
+    if (typeof window.__v120HackCanPass === 'function' && !window.__v120HackCanPass()) {
+      alert('배열을 기억한 뒤, 입력 단계에서만 패스카드를 사용할 수 있습니다.');
+      return;
+    }
+    var zero = document.getElementById('v105-hack-zero');
+    if (zero && zero.disabled) {
+      alert('배열을 기억한 뒤, 입력 단계에서만 패스카드를 사용할 수 있습니다.');
+      return;
+    }
+    if (typeof window.__v120HackBridgeSuccess !== 'function') {
+      alert('해킹 엔진 브리지가 준비되지 않았습니다. 미니게임을 닫았다가 다시 열어 주세요.');
+      return;
+    }
+    addHackPass(-1);
+    refreshHackPassUI();
+    var ok = window.__v120HackBridgeSuccess();
+    if (!ok) {
+      addHackPass(1);
+      refreshHackPassUI();
+      alert('패스카드 사용에 실패했습니다. 게임이 진행 중인지 확인해 주세요.');
+    }
+  };
+
+  var _origOpenShop = window.openShopModal;
+  window.openShopModal = function () {
+    if (typeof _origOpenShop === 'function') _origOpenShop();
+    setTimeout(function () {
+      injectShopHackPass();
+      refreshHackPassUI();
+      try {
+        var el = document.getElementById('shop-pyroxene-display');
+        if (el) el.textContent = String(getPyroBal());
+      } catch (e) {}
+    }, 30);
+  };
+
+  var _origOpenHack = window.v105OpenHack;
+  window.v105OpenHack = function () {
+    if (typeof _origOpenHack === 'function') _origOpenHack();
+    setTimeout(function () {
+      injectHackPassButton();
+      refreshHackPassUI();
+    }, 60);
+  };
+
+  function boot() {
+    ensureCss();
+    setTimeout(injectShopHackPass, 800);
+    setTimeout(patchCrystShop, 800);
+    setTimeout(injectHackPassButton, 1500);
+    console.log('[PRANA] v12.0 Code card + Hack pass ready');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+<!-- ========== v12.0 끝 ========== -->
 
 
 </html>
