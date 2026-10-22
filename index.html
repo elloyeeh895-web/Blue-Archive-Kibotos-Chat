@@ -4650,15 +4650,15 @@ ${bondNote}
   if (headActions && !document.getElementById('v74-profile-btn')) {
     const b = document.createElement('button');
     b.id = 'v74-profile-btn'; b.type = 'button'; b.className = 'v74-head-btn';
-    b.textContent = '학생 프로필'; b.onclick = openV74Profile;
+    b.textContent = '학생 프로필'; b.onclick = function(){ if(typeof window.openV74Profile==='function') window.openV74Profile(); };
     headActions.insertBefore(b, headActions.firstChild);
   }
   const menuList = document.querySelector('#main-menu-modal .menu-list');
   if (menuList && !document.getElementById('v74-story-menu-btn')) {
     const profileBtn = document.createElement('button'); profileBtn.type='button'; profileBtn.className='menu-item-btn';
-    profileBtn.textContent='🪪 현재 학생 프로필'; profileBtn.onclick=()=>{closeMenuModal();openV74Profile();};
+    profileBtn.textContent='🪪 현재 학생 프로필'; profileBtn.onclick=()=>{try{closeMenuModal();}catch(e){} if(typeof window.openV74Profile==='function') window.openV74Profile();};
     const storyBtn = document.createElement('button'); storyBtn.id='v74-story-menu-btn'; storyBtn.type='button'; storyBtn.className='menu-item-btn';
-    storyBtn.textContent='💗 인연 스토리'; storyBtn.onclick=()=>{closeMenuModal();openV74Stories();};
+    storyBtn.textContent='💗 인연 스토리'; storyBtn.onclick=()=>{try{closeMenuModal();}catch(e){} if(typeof window.openV74Stories==='function') window.openV74Stories();};
     menuList.insertBefore(storyBtn, menuList.firstChild); menuList.insertBefore(profileBtn, storyBtn);
   }
 
@@ -26928,6 +26928,1066 @@ body.v118-logo-cyan #schale-logo-overlay {
 })();
 </script>
 <!-- ========== v12.0 끝 ========== -->
+<!-- ========== v13.0 시작: 대화 내보내기·검색·북마크·공유코드 · 성능 ========== -->
+<style id="v13-css">
+#v13-search-bar{
+  display:none;flex-shrink:0;align-items:center;gap:8px;
+  padding:8px 12px;background:var(--card-bg);border-bottom:1px solid var(--border-color);
+  position:relative;z-index:5;
+}
+#v13-search-bar.show{display:flex;}
+#v13-search-input{
+  flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border-color);
+  background:var(--bg-color);color:var(--text-color);font-size:14px;outline:none;
+}
+#v13-search-input:focus{border-color:var(--accent-color);}
+#v13-search-count{font-size:11px;color:#8a9bb0;white-space:nowrap;min-width:48px;text-align:right;}
+#v13-search-close,#v13-search-prev,#v13-search-next{
+  border:1px solid var(--border-color);background:var(--bg-color);color:var(--text-color);
+  border-radius:6px;padding:6px 10px;font-size:13px;cursor:pointer;font-weight:700;
+}
+#v13-search-close:active,#v13-search-prev:active,#v13-search-next:active{border-color:var(--accent-color);}
+.message-row.v13-search-hit .message{outline:2px solid var(--accent-color);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent-color) 25%,transparent);}
+.message-row.v13-search-current .message{outline-color:#fbbf24;box-shadow:0 0 0 3px rgba(251,191,36,.35);}
+.v13-bm-btn{
+  border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-color);
+  border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;
+}
+.v13-bm-btn.on{color:#fbbf24;border-color:#fbbf24;}
+.v13-bm-btn:active{transform:scale(.96);border-color:var(--accent-color);}
+.message-row.v13-bookmarked .message{border-left:3px solid #fbbf24;}
+#v13-modal{
+  display:none;position:fixed;inset:0;z-index:10050;background:rgba(0,0,0,.78);
+  align-items:center;justify-content:center;padding:16px;box-sizing:border-box;
+}
+#v13-modal.open{display:flex !important;}
+.v13-box{
+  background:var(--card-bg,#151a24);border:1px solid var(--border-color,#2a3447);
+  border-radius:14px;padding:16px;width:100%;max-width:420px;max-height:85vh;overflow-y:auto;
+  color:var(--text-color,#e0e6ed);box-sizing:border-box;-webkit-overflow-scrolling:touch;
+}
+.v13-box h3{text-align:center;margin:0 0 8px;font-size:16px;}
+.v13-hint{font-size:12px;color:#8a9bb0;line-height:1.45;margin-bottom:12px;text-align:center;}
+.v13-field{margin-bottom:10px;}
+.v13-field label{display:block;font-size:12px;font-weight:700;color:#8a9bb0;margin-bottom:4px;}
+.v13-field textarea,.v13-field input[type="text"]{
+  width:100%;padding:10px;border-radius:8px;border:1px solid var(--border-color);
+  background:var(--bg-color);color:var(--text-color);font-size:13px;outline:none;box-sizing:border-box;
+  font-family:ui-monospace,Menlo,Consolas,monospace;
+}
+.v13-field textarea:focus,.v13-field input:focus{border-color:var(--accent-color);}
+.v13-btn-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.v13-btn{
+  flex:1;min-width:100px;padding:11px;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;
+  background:var(--accent-color,#8a2be2);color:#fff;
+}
+.v13-btn.gray{background:#334155;color:#fff;}
+.v13-btn.danger{background:#b91c1c;color:#fff;}
+.v13-btn:disabled{opacity:.45;}
+.v13-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;max-height:50vh;overflow-y:auto;}
+.v13-item{
+  padding:10px 12px;border:1px solid var(--border-color);border-radius:10px;background:var(--bg-color);
+  font-size:13px;line-height:1.4;
+}
+.v13-item .meta{font-size:11px;color:#8a9bb0;margin-top:4px;}
+.v13-item .acts{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.v13-item .acts button{
+  padding:5px 10px;border-radius:6px;border:1px solid var(--border-color);
+  background:var(--card-bg);color:var(--text-color);font-size:11px;font-weight:700;cursor:pointer;
+}
+.v13-item .acts button.danger{color:#fca5a5;border-color:#ef4444;}
+.v13-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+.v13-tab{
+  flex:1;min-width:70px;padding:8px 6px;border-radius:8px;border:1px solid var(--border-color);
+  background:var(--bg-color);color:var(--text-color);font-size:12px;font-weight:700;cursor:pointer;text-align:center;
+}
+.v13-tab.on{border-color:var(--accent-color);background:var(--accent-color);color:#fff;}
+#v13-offline-banner{
+  display:none;align-items:center;justify-content:center;gap:8px;
+  padding:6px 12px;font-size:12px;font-weight:600;background:#7f1d1d;color:#fecaca;
+  border-bottom:1px solid #991b1b;flex-shrink:0;z-index:4;
+}
+#v13-offline-banner.show{display:flex;}
+#v13-load-more{
+  display:none;align-self:center;margin:4px auto 8px;padding:8px 16px;
+  border:1px solid var(--border-color);border-radius:999px;background:var(--card-bg);
+  color:var(--text-color);font-size:12px;font-weight:700;cursor:pointer;
+}
+#v13-load-more.show{display:block;}
+.v13-code-preview{
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;line-height:1.4;
+  word-break:break-all;max-height:120px;overflow-y:auto;padding:10px;border-radius:8px;
+  background:var(--bg-color);border:1px dashed var(--border-color);margin:8px 0;user-select:all;
+}
+.v13-msg{font-size:12px;text-align:center;min-height:18px;margin:6px 0;color:var(--accent-color);}
+.v13-msg.err{color:#f87171;}
+mark.v13-hl{background:#fbbf24;color:#1e1b4b;border-radius:2px;padding:0 1px;}
+</style>
 
+<script id="v13-features">
+/**
+ * v13.0 — 키보토스 대화 OS
+ * A) 대화 내보내기 / 가져오기
+ * B) 채팅 검색
+ * C) 메시지 북마크
+ * D) 커스텀 학생 공유 코드 (압축 코드)
+ * 3) 성능: 오래된 메시지 접기 · 이미지 캐시 힌트 · 오프라인 배너
+ */
+(function () {
+  'use strict';
+  if (window.__PRANA_V13__) return;
+  window.__PRANA_V13__ = true;
+
+  var BM_KEY = 'PRANA_V13_BOOKMARKS';
+  var IMG_CACHE_KEY = 'PRANA_V13_IMG_CACHE';
+  var VIRTUAL_THRESHOLD = 99999; /* v13.1: 기본 비활성 (대화가 사라진 것처럼 보이던 문제 방지) */
+  var VIRTUAL_CHUNK = 40;
+
+  function sg(k) {
+    try { return localStorage.getItem(k) || ''; } catch (e) {
+      return (typeof safeGet === 'function') ? (safeGet(k) || '') : '';
+    }
+  }
+  function ss(k, v) {
+    try { localStorage.setItem(k, String(v)); } catch (e) {
+      if (typeof safeSet === 'function') safeSet(k, String(v));
+    }
+  }
+  function currentId() {
+    try {
+      if (typeof currentMode !== 'undefined' && currentMode) return currentMode;
+    } catch (e) {}
+    return sg('PRANA_MODE') || 'prana';
+  }
+  function chatKey() {
+    try {
+      if (typeof chatStorageKey === 'function') return chatStorageKey();
+    } catch (e) {}
+    return 'PRANA_CHAT_' + currentId();
+  }
+  function esc(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /* ========== A. Export / Import ========== */
+  function collectCurrentChat() {
+    var history = [];
+    try {
+      if (typeof conversationHistory !== 'undefined' && Array.isArray(conversationHistory)) {
+        history = conversationHistory.slice();
+      }
+    } catch (e) {}
+    var messages = [];
+    var box = document.getElementById('chat-container');
+    if (box) {
+      box.querySelectorAll('.message').forEach(function (el) {
+        if (el.id === 'loading-msg') return;
+        messages.push({
+          text: (el.querySelector('.message-text') && el.querySelector('.message-text').textContent) || '',
+          isBot: el.classList.contains('bot'),
+          charName: (el.querySelector('.sender-name') && el.querySelector('.sender-name').textContent) || '',
+          historyIndex: el.dataset.historyIndex != null ? el.dataset.historyIndex : null,
+          sticker: el.classList.contains('sticker-message')
+        });
+      });
+    }
+    if (!messages.length) {
+      try {
+        var raw = sg(chatKey());
+        if (raw) {
+          var parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.messages)) messages = parsed.messages;
+          if (parsed && Array.isArray(parsed.history)) history = parsed.history;
+        }
+      } catch (e2) {}
+    }
+    return {
+      version: 13,
+      type: 'prana-chat',
+      mode: currentId(),
+      exportedAt: Date.now(),
+      history: history,
+      messages: messages
+    };
+  }
+
+  function downloadJson(obj, filename) {
+    var blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      URL.revokeObjectURL(url);
+      a.remove();
+    }, 800);
+  }
+
+  window.v13ExportChat = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    var data = collectCurrentChat();
+    var name = 'kibotos-chat-' + (data.mode || 'chat') + '-' + new Date().toISOString().slice(0, 10) + '.json';
+    downloadJson(data, name);
+    alert('현재 대화를 내보냈습니다.\n파일: ' + name);
+  };
+
+  window.v13ExportAllChats = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    var all = { version: 13, type: 'prana-chat-bundle', exportedAt: Date.now(), chats: {} };
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('PRANA_CHAT_') === 0) {
+          try {
+            var v = localStorage.getItem(k);
+            if (v) all.chats[k] = JSON.parse(v);
+          } catch (e2) {}
+        }
+      }
+    } catch (e3) {
+      alert('전체 내보내기에 실패했습니다.');
+      return;
+    }
+    var name = 'kibotos-chats-all-' + new Date().toISOString().slice(0, 10) + '.json';
+    downloadJson(all, name);
+    alert('저장된 대화 ' + Object.keys(all.chats).length + '개를 내보냈습니다.');
+  };
+
+  window.v13ImportChat = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json,text/plain';
+    input.onchange = function () {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        try {
+          var data = JSON.parse(String(reader.result || ''));
+          if (data.type === 'prana-chat-bundle' && data.chats) {
+            var keys = Object.keys(data.chats);
+            if (!keys.length) { alert('가져올 대화가 없습니다.'); return; }
+            if (!confirm('번들 파일에서 대화 ' + keys.length + '개를 덮어쓸까요?\n기존 같은 키의 대화는 교체됩니다.')) return;
+            keys.forEach(function (k) {
+              try { ss(k, JSON.stringify(data.chats[k])); } catch (e) {}
+            });
+            alert('가져오기 완료. 대화 상대를 다시 선택하면 반영됩니다.');
+            return;
+          }
+          if (!data || (!Array.isArray(data.messages) && !Array.isArray(data.history))) {
+            alert('올바른 키보토스 대화 파일이 아닙니다.');
+            return;
+          }
+          var mode = data.mode || currentId();
+          var key = 'PRANA_CHAT_' + mode;
+          if (!confirm('「' + mode + '」 대화를 이 파일로 교체할까요?\n현재 기기의 해당 대화는 덮어씌워집니다.')) return;
+          ss(key, JSON.stringify({
+            savedAt: Date.now(),
+            history: Array.isArray(data.history) ? data.history : [],
+            messages: Array.isArray(data.messages) ? data.messages : []
+          }));
+          if (currentId() === mode) {
+            try {
+              if (typeof initChat === 'function') initChat();
+              else location.reload();
+            } catch (e4) { location.reload(); }
+          } else {
+            alert('가져오기 완료. 해당 학생을 선택하면 대화가 표시됩니다.');
+          }
+        } catch (err) {
+          alert('파일을 읽지 못했습니다.\n' + (err && err.message ? err.message : ''));
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
+  /* ========== B. Chat Search ========== */
+  var searchState = { hits: [], idx: -1, q: '' };
+
+  function ensureSearchBar() {
+    if (document.getElementById('v13-search-bar')) return;
+    var bar = document.createElement('div');
+    bar.id = 'v13-search-bar';
+    bar.innerHTML =
+      '<input type="search" id="v13-search-input" placeholder="대화 검색…" autocomplete="off">' +
+      '<span id="v13-search-count">0</span>' +
+      '<button type="button" id="v13-search-prev" title="이전">▲</button>' +
+      '<button type="button" id="v13-search-next" title="다음">▼</button>' +
+      '<button type="button" id="v13-search-close" title="닫기">✕</button>';
+    var header = document.querySelector('header');
+    if (header && header.parentNode) {
+      header.parentNode.insertBefore(bar, header.nextSibling);
+    } else {
+      document.body.insertBefore(bar, document.body.firstChild);
+    }
+    document.getElementById('v13-search-close').onclick = function () { window.v13CloseSearch(); };
+    document.getElementById('v13-search-prev').onclick = function () { window.v13SearchNav(-1); };
+    document.getElementById('v13-search-next').onclick = function () { window.v13SearchNav(1); };
+    var inp = document.getElementById('v13-search-input');
+    var t = null;
+    inp.addEventListener('input', function () {
+      clearTimeout(t);
+      t = setTimeout(function () { runSearch(inp.value); }, 120);
+    });
+    inp.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        window.v13SearchNav(ev.shiftKey ? -1 : 1);
+      } else if (ev.key === 'Escape') {
+        window.v13CloseSearch();
+      }
+    });
+  }
+
+  function clearSearchHighlight() {
+    document.querySelectorAll('.message-row.v13-search-hit, .message-row.v13-search-current').forEach(function (r) {
+      r.classList.remove('v13-search-hit', 'v13-search-current');
+    });
+    document.querySelectorAll('mark.v13-hl').forEach(function (m) {
+      var p = m.parentNode;
+      if (p) {
+        p.replaceChild(document.createTextNode(m.textContent), m);
+        p.normalize();
+      }
+    });
+  }
+
+  function runSearch(q) {
+    ensureSearchBar();
+    clearSearchHighlight();
+    searchState.hits = [];
+    searchState.idx = -1;
+    searchState.q = String(q || '').trim();
+    var countEl = document.getElementById('v13-search-count');
+    if (!searchState.q) {
+      if (countEl) countEl.textContent = '0';
+      return;
+    }
+    var lower = searchState.q.toLowerCase();
+    var box = document.getElementById('chat-container');
+    if (!box) return;
+    box.querySelectorAll('.message-row').forEach(function (row) {
+      if (row.id === 'loading-row') return;
+      if (row.style.display === 'none' && row.dataset.v13Collapsed) return;
+      var textEl = row.querySelector('.message-text');
+      if (!textEl) return;
+      var text = textEl.textContent || '';
+      if (text.toLowerCase().indexOf(lower) >= 0) {
+        row.classList.add('v13-search-hit');
+        searchState.hits.push(row);
+      }
+    });
+    if (countEl) countEl.textContent = searchState.hits.length ? ('1/' + searchState.hits.length) : '0';
+    if (searchState.hits.length) window.v13SearchNav(1);
+  }
+
+  window.v13OpenSearch = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    ensureSearchBar();
+    var bar = document.getElementById('v13-search-bar');
+    if (bar) bar.classList.add('show');
+    var inp = document.getElementById('v13-search-input');
+    if (inp) { inp.value = searchState.q || ''; inp.focus(); if (searchState.q) runSearch(searchState.q); }
+  };
+
+  window.v13CloseSearch = function () {
+    var bar = document.getElementById('v13-search-bar');
+    if (bar) bar.classList.remove('show');
+    clearSearchHighlight();
+    searchState.hits = [];
+    searchState.idx = -1;
+  };
+
+  window.v13SearchNav = function (dir) {
+    if (!searchState.hits.length) return;
+    if (searchState.idx >= 0 && searchState.hits[searchState.idx]) {
+      searchState.hits[searchState.idx].classList.remove('v13-search-current');
+    }
+    searchState.idx = (searchState.idx + dir + searchState.hits.length) % searchState.hits.length;
+    var row = searchState.hits[searchState.idx];
+    if (row) {
+      row.classList.add('v13-search-current');
+      try { row.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { row.scrollIntoView(true); }
+    }
+    var countEl = document.getElementById('v13-search-count');
+    if (countEl) countEl.textContent = (searchState.idx + 1) + '/' + searchState.hits.length;
+  };
+
+  /* ========== C. Bookmarks ========== */
+  function loadBookmarks() {
+    try {
+      var raw = sg(BM_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+  function saveBookmarks(map) {
+    ss(BM_KEY, JSON.stringify(map));
+  }
+  function bmId(mode, text, isBot, ts) {
+    var base = String(mode) + '|' + (isBot ? '1' : '0') + '|' + String(text).slice(0, 120);
+    var h = 0;
+    for (var i = 0; i < base.length; i++) h = ((h << 5) - h + base.charCodeAt(i)) | 0;
+    return 'bm_' + (h >>> 0).toString(36) + (ts ? ('_' + ts) : '');
+  }
+
+  function getMessageFingerprint(msgEl) {
+    var text = (msgEl.querySelector('.message-text') && msgEl.querySelector('.message-text').textContent) || '';
+    var isBot = msgEl.classList.contains('bot');
+    var charName = (msgEl.querySelector('.sender-name') && msgEl.querySelector('.sender-name').textContent) || '';
+    return { text: text, isBot: isBot, charName: charName, mode: currentId() };
+  }
+
+  function isBookmarked(fp) {
+    var map = loadBookmarks();
+    var id = bmId(fp.mode, fp.text, fp.isBot);
+    return !!map[id];
+  }
+
+  function toggleBookmark(msgEl, btn) {
+    var fp = getMessageFingerprint(msgEl);
+    if (!fp.text) return;
+    var map = loadBookmarks();
+    var id = bmId(fp.mode, fp.text, fp.isBot);
+    if (map[id]) {
+      delete map[id];
+      if (btn) { btn.classList.remove('on'); btn.textContent = '☆'; }
+      var row = msgEl.closest('.message-row');
+      if (row) row.classList.remove('v13-bookmarked');
+    } else {
+      map[id] = {
+        id: id,
+        mode: fp.mode,
+        text: fp.text.slice(0, 500),
+        isBot: fp.isBot,
+        charName: fp.charName,
+        savedAt: Date.now()
+      };
+      if (btn) { btn.classList.add('on'); btn.textContent = '★'; }
+      var row2 = msgEl.closest('.message-row');
+      if (row2) row2.classList.add('v13-bookmarked');
+    }
+    saveBookmarks(map);
+  }
+
+
+  function v13CleanupDupStars() {
+    try {
+      document.querySelectorAll('.message-row').forEach(function (row) {
+        var all = row.querySelectorAll('.v13-bm-btn');
+        for (var i = 1; i < all.length; i++) all[i].remove();
+      });
+    } catch (e) {}
+  }
+
+  function injectBookmarkButtons() {
+    var box = document.getElementById('chat-container');
+    if (!box) return;
+    box.querySelectorAll('.message-row').forEach(function (row) {
+      if (row.id === 'loading-row') return;
+      var msg = row.querySelector('.message');
+      if (!msg) return;
+      /* 이미 북마크 버튼이 있으면 중복 생성 금지 (row 기준) */
+      var existing = row.querySelectorAll('.v13-bm-btn');
+      if (existing.length > 1) {
+        for (var i = 1; i < existing.length; i++) existing[i].remove();
+      }
+      if (row.querySelector('.v13-bm-btn')) {
+        var one = row.querySelector('.v13-bm-btn');
+        var fp0 = getMessageFingerprint(msg);
+        if (isBookmarked(fp0)) {
+          one.classList.add('on'); one.textContent = '★'; row.classList.add('v13-bookmarked');
+        } else {
+          one.classList.remove('on'); one.textContent = '☆'; row.classList.remove('v13-bookmarked');
+        }
+        return;
+      }
+      var actions = row.querySelector('.message-actions');
+      if (!actions) {
+        actions = document.createElement('div');
+        actions.className = 'message-actions';
+        row.appendChild(actions);
+      }
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'v13-bm-btn';
+      btn.title = '북마크';
+      var fp = getMessageFingerprint(msg);
+      if (isBookmarked(fp)) {
+        btn.classList.add('on');
+        btn.textContent = '★';
+        row.classList.add('v13-bookmarked');
+      } else {
+        btn.textContent = '☆';
+      }
+      btn.onclick = function (ev) {
+        ev.stopPropagation();
+        toggleBookmark(msg, btn);
+      };
+      actions.appendChild(btn);
+    });
+  }
+
+  window.v13OpenBookmarks = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    ensureModal();
+    var map = loadBookmarks();
+    var keys = Object.keys(map).sort(function (a, b) {
+      return (map[b].savedAt || 0) - (map[a].savedAt || 0);
+    });
+    var body = document.getElementById('v13-body');
+    var title = document.getElementById('v13-title');
+    if (title) title.textContent = '⭐ 북마크';
+    if (!body) return;
+    if (!keys.length) {
+      body.innerHTML = '<p class="v13-hint">저장한 북마크가 없습니다.<br>메시지 옆 ☆ 버튼을 눌러 추가하세요.</p>' +
+        '<div class="v13-btn-row"><button type="button" class="v13-btn gray" onclick="window.closeV13Modal()">닫기</button></div>';
+      openModal();
+      return;
+    }
+    var html = '<p class="v13-hint">총 ' + keys.length + '개 · 탭하면 해당 대화로 이동할 수 있습니다.</p><div class="v13-list">';
+    keys.forEach(function (k) {
+      var b = map[k];
+      html += '<div class="v13-item">' +
+        '<div><strong>' + esc(b.isBot ? (b.charName || '학생') : '나') + '</strong> · <span style="font-size:11px;color:#8a9bb0;">' + esc(b.mode) + '</span></div>' +
+        '<div style="margin-top:4px;">' + esc((b.text || '').slice(0, 160)) + ((b.text || '').length > 160 ? '…' : '') + '</div>' +
+        '<div class="acts">' +
+        '<button type="button" onclick="window.v13GoBookmark(\'' + esc(k) + '\')">대화로</button>' +
+        '<button type="button" class="danger" onclick="window.v13DeleteBookmark(\'' + esc(k) + '\')">삭제</button>' +
+        '</div></div>';
+    });
+    html += '</div><div class="v13-btn-row">' +
+      '<button type="button" class="v13-btn danger" onclick="window.v13ClearBookmarks()">전체 삭제</button>' +
+      '<button type="button" class="v13-btn gray" onclick="window.closeV13Modal()">닫기</button></div>';
+    body.innerHTML = html;
+    openModal();
+  };
+
+  window.v13DeleteBookmark = function (id) {
+    var map = loadBookmarks();
+    delete map[id];
+    saveBookmarks(map);
+    window.v13OpenBookmarks();
+    injectBookmarkButtons();
+  };
+
+  window.v13ClearBookmarks = function () {
+    if (!confirm('모든 북마크를 삭제할까요?')) return;
+    saveBookmarks({});
+    window.v13OpenBookmarks();
+    document.querySelectorAll('.v13-bm-btn.on').forEach(function (b) {
+      b.classList.remove('on');
+      b.textContent = '☆';
+    });
+    document.querySelectorAll('.message-row.v13-bookmarked').forEach(function (r) {
+      r.classList.remove('v13-bookmarked');
+    });
+  };
+
+  window.v13GoBookmark = function (id) {
+    var map = loadBookmarks();
+    var b = map[id];
+    if (!b) return;
+    window.closeV13Modal();
+    var go = function () {
+      setTimeout(function () {
+        var box = document.getElementById('chat-container');
+        if (!box) return;
+        var target = null;
+        box.querySelectorAll('.message').forEach(function (el) {
+          var t = (el.querySelector('.message-text') && el.querySelector('.message-text').textContent) || '';
+          if (t.indexOf((b.text || '').slice(0, 40)) >= 0) target = el.closest('.message-row');
+        });
+        if (target) {
+          try { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { target.scrollIntoView(true); }
+          target.classList.add('v13-search-current');
+          setTimeout(function () { target.classList.remove('v13-search-current'); }, 2000);
+        }
+      }, 400);
+    };
+    if (currentId() !== b.mode) {
+      try {
+        if (typeof switchMode === 'function') {
+          switchMode(b.mode);
+          go();
+          return;
+        }
+      } catch (e) {}
+      ss('PRANA_MODE', b.mode);
+      try { if (typeof initChat === 'function') { initChat(); go(); return; } } catch (e2) {}
+    }
+    go();
+  };
+
+  /* ========== D. Custom share code ========== */
+  function utf8ToB64(str) {
+    try {
+      return btoa(unescape(encodeURIComponent(str)));
+    } catch (e) {
+      return btoa(str);
+    }
+  }
+  function b64ToUtf8(str) {
+    try {
+      return decodeURIComponent(escape(atob(str)));
+    } catch (e) {
+      return atob(str);
+    }
+  }
+
+  function packPersona(p) {
+    var slim = {
+      n: p.name || '',
+      t: p.title || '',
+      s: p.sub || '',
+      a: p.avatar || '⭐',
+      g: p.greeting || '',
+      p: p.prompt || '',
+      note: p.note || '',
+      image: p.image || '',
+      expressions: p.expressions || {},
+      theme: p.theme || null,
+      v119: p.v119 || null
+    };
+    var json = JSON.stringify(slim);
+    return 'PRANA13:' + utf8ToB64(json);
+  }
+
+  function unpackPersona(code) {
+    var c = String(code || '').trim();
+    if (c.indexOf('PRANA13:') === 0) c = c.slice(8);
+    c = c.replace(/\s+/g, '');
+    var json = b64ToUtf8(c);
+    var slim = JSON.parse(json);
+    if (!slim || !slim.n) throw new Error('invalid');
+    return slim;
+  }
+
+  function getCustomsMap() {
+    try {
+      if (typeof loadCustomPersonas === 'function') {
+        var m = loadCustomPersonas();
+        if (m && typeof m === 'object') return m;
+      }
+    } catch (e) {}
+    try {
+      var raw = sg('PRANA_CUSTOM_PERSONAS');
+      return raw ? JSON.parse(raw) : {};
+    } catch (e2) { return {}; }
+  }
+
+  function saveCustomsMap(map) {
+    ss('PRANA_CUSTOM_PERSONAS', JSON.stringify(map));
+    try {
+      if (typeof customPersonas !== 'undefined') {
+        Object.keys(customPersonas).forEach(function (k) { delete customPersonas[k]; });
+        Object.keys(map).forEach(function (k) { customPersonas[k] = map[k]; });
+      }
+    } catch (e) {}
+    try {
+      if (typeof PERSONAS !== 'undefined') {
+        Object.keys(PERSONAS).forEach(function (k) {
+          if (PERSONAS[k] && PERSONAS[k].isCustom) delete PERSONAS[k];
+        });
+        Object.keys(map).forEach(function (k) { PERSONAS[k] = map[k]; });
+      }
+    } catch (e2) {}
+  }
+
+  window.v13OpenShareCode = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    ensureModal();
+    var title = document.getElementById('v13-title');
+    var body = document.getElementById('v13-body');
+    if (title) title.textContent = '🔗 커스텀 공유 코드';
+    var map = getCustomsMap();
+    var keys = Object.keys(map);
+    var opts = keys.map(function (k) {
+      return '<option value="' + esc(k) + '">' + esc(map[k].name || k) + '</option>';
+    }).join('');
+    body.innerHTML =
+      '<div class="v13-tabs">' +
+      '<button type="button" class="v13-tab on" data-t="export" onclick="window.v13ShareTab(\'export\')">내보내기</button>' +
+      '<button type="button" class="v13-tab" data-t="import" onclick="window.v13ShareTab(\'import\')">가져오기</button>' +
+      '</div>' +
+      '<div id="v13-share-export">' +
+      (keys.length
+        ? ('<div class="v13-field"><label>학생 선택</label><select id="v13-share-sel" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-color);color:var(--text-color);">' +
+          opts + '</select></div>' +
+          '<button type="button" class="v13-btn" onclick="window.v13MakeShareCode()">코드 생성</button>' +
+          '<div class="v13-code-preview" id="v13-share-out" style="display:none;"></div>' +
+          '<div class="v13-btn-row" id="v13-share-copy-row" style="display:none;">' +
+          '<button type="button" class="v13-btn" onclick="window.v13CopyShareCode()">클립보드 복사</button></div>')
+        : '<p class="v13-hint">내보낼 커스텀 학생이 없습니다.</p>') +
+      '</div>' +
+      '<div id="v13-share-import" style="display:none;">' +
+      '<div class="v13-field"><label>공유 코드 붙여넣기</label>' +
+      '<textarea id="v13-share-in" rows="5" placeholder="PRANA13:..."></textarea></div>' +
+      '<button type="button" class="v13-btn" onclick="window.v13ImportShareCode()">학생 추가</button>' +
+      '</div>' +
+      '<p class="v13-msg" id="v13-share-msg"></p>' +
+      '<div class="v13-btn-row"><button type="button" class="v13-btn gray" onclick="window.closeV13Modal()">닫기</button></div>';
+    openModal();
+  };
+
+  window.v13ShareTab = function (t) {
+    document.querySelectorAll('#v13-body .v13-tab').forEach(function (el) {
+      el.classList.toggle('on', el.getAttribute('data-t') === t);
+    });
+    var ex = document.getElementById('v13-share-export');
+    var im = document.getElementById('v13-share-import');
+    if (ex) ex.style.display = t === 'export' ? '' : 'none';
+    if (im) im.style.display = t === 'import' ? '' : 'none';
+  };
+
+  window.v13MakeShareCode = function () {
+    var sel = document.getElementById('v13-share-sel');
+    if (!sel) return;
+    var map = getCustomsMap();
+    var p = map[sel.value];
+    if (!p) return;
+    var code = packPersona(p);
+    var out = document.getElementById('v13-share-out');
+    var row = document.getElementById('v13-share-copy-row');
+    if (out) { out.style.display = ''; out.textContent = code; }
+    if (row) row.style.display = 'flex';
+    var msg = document.getElementById('v13-share-msg');
+    if (msg) { msg.className = 'v13-msg'; msg.textContent = '코드 생성 완료 · 복사해서 친구에게 보내세요.'; }
+  };
+
+  window.v13CopyShareCode = function () {
+    var out = document.getElementById('v13-share-out');
+    if (!out || !out.textContent) return;
+    var text = out.textContent;
+    function ok() {
+      var msg = document.getElementById('v13-share-msg');
+      if (msg) { msg.className = 'v13-msg'; msg.textContent = '복사되었습니다!'; }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(ok).catch(function () {
+        fallbackCopy(text); ok();
+      });
+    } else {
+      fallbackCopy(text); ok();
+    }
+  };
+
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+  }
+
+  window.v13ImportShareCode = function () {
+    var ta = document.getElementById('v13-share-in');
+    var msg = document.getElementById('v13-share-msg');
+    if (!ta) return;
+    try {
+      var slim = unpackPersona(ta.value);
+      var map = getCustomsMap();
+      var id = 'custom_' + Date.now();
+      var persona = {
+        id: id,
+        name: slim.n,
+        title: slim.t || slim.n,
+        sub: slim.s || '커스텀 학생 • 공유받음',
+        avatar: slim.a || '⭐',
+        greeting: slim.g || ('안녕하세요, 선생님!'),
+        prompt: slim.p || '',
+        note: slim.note || '',
+        image: slim.image || '',
+        expressions: slim.expressions || {},
+        isCustom: true,
+        theme: slim.theme || null,
+        v119: slim.v119 || null
+      };
+      if (!persona.theme) {
+        persona.theme = {
+          bg: '#0b0e14', card: '#151a24', text: '#e0e6ed', headerText: '#e0e6ed',
+          botBubble: '#1f2636', botText: '#e2e8f0', userBubble: '#3a2e56', userText: '#ffffff',
+          border: '#2a3447', accent: '#8a2be2',
+          avatarBg: 'linear-gradient(135deg, #4b0082, #8a2be2)', avatarBorder: '#b19ffb'
+        };
+      }
+      map[id] = persona;
+      saveCustomsMap(map);
+      if (msg) { msg.className = 'v13-msg'; msg.textContent = '「' + persona.name + '」 추가 완료!'; }
+      try {
+        if (typeof renderCharList === 'function') {
+          renderCharList((document.getElementById('char-search-input') || {}).value || '');
+        }
+      } catch (e) {}
+      setTimeout(function () {
+        window.closeV13Modal();
+        try {
+          if (typeof switchMode === 'function') switchMode(id);
+        } catch (e2) {}
+      }, 500);
+    } catch (err) {
+      if (msg) { msg.className = 'v13-msg err'; msg.textContent = '코드가 올바르지 않습니다.'; }
+    }
+  };
+
+  /* ========== 3. Performance: virtual collapse + offline + image cache hint ========== */
+  function ensureLoadMoreBtn() {
+    var box = document.getElementById('chat-container');
+    if (!box || document.getElementById('v13-load-more')) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'v13-load-more';
+    btn.textContent = '↑ 이전 메시지 더 보기';
+    btn.onclick = function () { window.v13RevealMore(); };
+    box.insertBefore(btn, box.firstChild);
+  }
+
+  function applyVirtualCollapse() {
+    var box = document.getElementById('chat-container');
+    if (!box) return;
+    /* v13.1: 옵트인 전에는 접지 않음 */
+    if (sg('PRANA_V13_VIRTUAL') !== '1') {
+      var btnOff = document.getElementById('v13-load-more');
+      if (btnOff) btnOff.classList.remove('show');
+      box.querySelectorAll('.message-row[data-v13-collapsed="1"]').forEach(function (r) {
+        r.style.display = '';
+        delete r.dataset.v13Collapsed;
+      });
+      return;
+    }
+    ensureLoadMoreBtn();
+    var rows = Array.prototype.slice.call(box.querySelectorAll('.message-row')).filter(function (r) {
+      return r.id !== 'loading-row';
+    });
+    var btn = document.getElementById('v13-load-more');
+    if (rows.length <= VIRTUAL_THRESHOLD) {
+      rows.forEach(function (r) {
+        r.style.display = '';
+        delete r.dataset.v13Collapsed;
+      });
+      if (btn) btn.classList.remove('show');
+      return;
+    }
+    var hideUntil = rows.length - VIRTUAL_THRESHOLD;
+    var collapsed = 0;
+    rows.forEach(function (r, i) {
+      if (i < hideUntil && !r.dataset.v13Pinned) {
+        r.style.display = 'none';
+        r.dataset.v13Collapsed = '1';
+        collapsed++;
+      } else {
+        r.style.display = '';
+        delete r.dataset.v13Collapsed;
+      }
+    });
+    if (btn) {
+      if (collapsed > 0) {
+        btn.classList.add('show');
+        btn.textContent = '↑ 이전 메시지 ' + collapsed + '개 더 보기';
+      } else {
+        btn.classList.remove('show');
+      }
+    }
+  }
+
+  window.v13RevealMore = function () {
+    var box = document.getElementById('chat-container');
+    if (!box) return;
+    var collapsed = Array.prototype.slice.call(box.querySelectorAll('.message-row[data-v13-collapsed="1"]'));
+    var reveal = collapsed.slice(Math.max(0, collapsed.length - VIRTUAL_CHUNK));
+    reveal.forEach(function (r) {
+      r.style.display = '';
+      delete r.dataset.v13Collapsed;
+      r.dataset.v13Pinned = '1';
+    });
+    applyVirtualCollapse();
+  };
+
+  function ensureOfflineBanner() {
+    if (document.getElementById('v13-offline-banner')) return;
+    var ban = document.createElement('div');
+    ban.id = 'v13-offline-banner';
+    ban.textContent = '오프라인 · 인터넷 연결 후 Gemini 응답을 사용할 수 있습니다';
+    var header = document.querySelector('header');
+    if (header && header.parentNode) header.parentNode.insertBefore(ban, header.nextSibling);
+    else document.body.insertBefore(ban, document.body.firstChild);
+  }
+
+  function updateOnlineStatus() {
+    ensureOfflineBanner();
+    var ban = document.getElementById('v13-offline-banner');
+    if (!ban) return;
+    if (navigator.onLine === false) ban.classList.add('show');
+    else ban.classList.remove('show');
+  }
+
+  function warmImageCache() {
+    try {
+      var map = getCustomsMap();
+      Object.keys(map).forEach(function (k) {
+        var p = map[k];
+        if (p.image) {
+          var img = new Image();
+          img.decoding = 'async';
+          img.src = p.image;
+        }
+        var ex = p.expressions || {};
+        ['happy', 'sad', 'surprised'].forEach(function (key) {
+          if (ex[key]) {
+            var i2 = new Image();
+            i2.decoding = 'async';
+            i2.src = ex[key];
+          }
+        });
+      });
+    } catch (e) {}
+  }
+
+  /* ========== Modal shell ========== */
+  function ensureModal() {
+    if (document.getElementById('v13-modal')) return;
+    var m = document.createElement('div');
+    m.id = 'v13-modal';
+    m.innerHTML = '<div class="v13-box"><h3 id="v13-title">v13</h3><div id="v13-body"></div></div>';
+    m.addEventListener('click', function (ev) {
+      if (ev.target === m) window.closeV13Modal();
+    });
+    document.body.appendChild(m);
+  }
+  function openModal() {
+    ensureModal();
+    var m = document.getElementById('v13-modal');
+    if (m) { m.classList.add('open'); m.style.display = 'flex'; }
+  }
+  window.closeV13Modal = function () {
+    var m = document.getElementById('v13-modal');
+    if (m) { m.classList.remove('open'); m.style.display = 'none'; }
+  };
+
+  window.v13OpenTools = function () {
+    try { if (typeof closeMenuModal === 'function') closeMenuModal(); } catch (e) {}
+    ensureModal();
+    var title = document.getElementById('v13-title');
+    var body = document.getElementById('v13-body');
+    if (title) title.textContent = '🧰 대화 도구 (v13)';
+    body.innerHTML =
+      '<p class="v13-hint">내보내기 · 검색 · 북마크 · 공유 코드</p>' +
+      '<button type="button" class="v13-btn" style="margin-bottom:8px;" onclick="window.v13ExportChat();window.closeV13Modal();">📤 현재 대화 내보내기</button>' +
+      '<button type="button" class="v13-btn gray" style="margin-bottom:8px;" onclick="window.v13ExportAllChats();window.closeV13Modal();">📦 전체 대화 내보내기</button>' +
+      '<button type="button" class="v13-btn gray" style="margin-bottom:8px;" onclick="window.v13ImportChat();window.closeV13Modal();">📥 대화 가져오기</button>' +
+      '<button type="button" class="v13-btn" style="margin-bottom:8px;" onclick="window.closeV13Modal();window.v13OpenSearch();">🔍 채팅 검색</button>' +
+      '<button type="button" class="v13-btn" style="margin-bottom:8px;" onclick="window.v13OpenBookmarks();">⭐ 북마크</button>' +
+      '<button type="button" class="v13-btn" style="margin-bottom:8px;" onclick="window.v13OpenShareCode();">🔗 커스텀 공유 코드</button>' +
+      '<div class="v13-btn-row"><button type="button" class="v13-btn gray" onclick="window.closeV13Modal()">닫기</button></div>';
+    openModal();
+  };
+
+  /* ========== Menu injection + hooks ========== */
+  function injectMenu() {
+    var list = document.querySelector('#main-menu-modal .menu-list');
+    if (!list) return;
+    if (!document.getElementById('menu-v13-tools')) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'menu-v13-tools';
+      btn.className = 'menu-item-btn';
+      btn.setAttribute('data-search', '내보내기 가져오기 검색 북마크 공유 백업 export import search bookmark share v13');
+      btn.innerHTML = '🧰 대화 도구 (내보내기·검색·북마크)';
+      btn.onclick = function () { window.v13OpenTools(); };
+      list.insertBefore(btn, list.firstChild);
+    }
+    if (!document.getElementById('menu-v13-search')) {
+      var sbtn = document.createElement('button');
+      sbtn.type = 'button';
+      sbtn.id = 'menu-v13-search';
+      sbtn.className = 'menu-item-btn';
+      sbtn.setAttribute('data-search', '검색 search find');
+      sbtn.innerHTML = '🔍 채팅 검색';
+      sbtn.onclick = function () { window.v13OpenSearch(); };
+      var ref = document.getElementById('menu-v13-tools');
+      if (ref && ref.nextSibling) list.insertBefore(sbtn, ref.nextSibling);
+      else list.appendChild(sbtn);
+    }
+  }
+
+  function patchAppendMessage() {
+    var tryPatch = function () {
+      var target = null;
+      var onWindow = false;
+      if (typeof window.appendMessage === 'function' && !window.appendMessage.__v13) {
+        target = window.appendMessage;
+        onWindow = true;
+      }
+      if (!target) return false;
+      var wrapped = function (sender, text, isBot, charName, historyIndex, options) {
+        var el = target.apply(this, arguments);
+        try {
+          setTimeout(function () {
+            injectBookmarkButtons();
+            applyVirtualCollapse();
+          }, 0);
+        } catch (e) {}
+        return el;
+      };
+      wrapped.__v13 = true;
+      window.appendMessage = wrapped;
+      return true;
+    };
+    if (!tryPatch()) {
+      setTimeout(tryPatch, 500);
+      setTimeout(tryPatch, 2000);
+    }
+  }
+
+  function observeChat() {
+    var box = document.getElementById('chat-container');
+    if (!box || box.__v13Obs) return;
+    box.__v13Obs = true;
+    var t = null;
+    var mo = new MutationObserver(function () {
+      clearTimeout(t);
+      t = setTimeout(function () {
+        v13CleanupDupStars();
+        injectBookmarkButtons();
+        applyVirtualCollapse();
+      }, 100);
+    });
+    mo.observe(box, { childList: true, subtree: true });
+  }
+
+  function boot() {
+    ensureSearchBar();
+    ensureOfflineBanner();
+    ensureModal();
+    v13CleanupDupStars();
+    injectMenu();
+    patchAppendMessage();
+    observeChat();
+    updateOnlineStatus();
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    setTimeout(injectMenu, 600);
+    setTimeout(injectMenu, 2000);
+    setTimeout(function () {
+      injectBookmarkButtons();
+      applyVirtualCollapse();
+      warmImageCache();
+    }, 1200);
+    setTimeout(warmImageCache, 5000);
+    console.log('[PRANA] v13.0 tools ready (export/search/bookmark/share/perf)');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+<!-- ========== v13.0 끝 ========== -->
 
 </html>
